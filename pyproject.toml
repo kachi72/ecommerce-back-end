@@ -1,0 +1,76 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ekumidayomi"
+version = "0.1.0"
+description = "Ẹkúmidáyọ̀mí ecommerce backend"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "alembic>=1.16,<2",
+  "asyncpg>=0.30,<1",
+  "fastapi>=0.116,<1",
+  "pydantic-settings>=2.10,<3",
+  "redis>=6,<7",
+  "sqlalchemy[asyncio]>=2.0.41,<3",
+  "uvicorn[standard]>=0.35,<1",
+]
+
+[dependency-groups]
+dev = [
+  "fakeredis>=2.30,<3",
+  "furo>=2025.7.19",
+  "httpx>=0.28,<1",
+  "mypy>=1.17,<2",
+  "myst-parser>=4,<5",
+  "pytest>=8.4,<9",
+  "pytest-asyncio>=1.1,<2",
+  "pytest-cov>=6.2,<7",
+  "ruff>=0.12,<1",
+  "sphinx>=8.2,<9",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ekumidayomi"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "ASYNC", "S", "RUF"]
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/ekumidayomi/tests/**/*.py" = ["S105", "S106"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+packages = ["ekumidayomi"]
+mypy_path = "src"
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+asyncio_mode = "auto"
+testpaths = ["src/ekumidayomi/tests"]
+markers = [
+  "integration: requires isolated PostgreSQL and Redis-compatible infrastructure",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["ekumidayomi"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = true
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "if __name__ == .__main__.:",
+]
