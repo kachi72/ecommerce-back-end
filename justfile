@@ -34,3 +34,21 @@ test:
     uv run pytest --cov=ekumidayomi --cov-report=term-missing
 
 check: lint format-check typecheck test
+
+migrate:
+    uv run alembic upgrade head
+
+migration message:
+    uv run alembic revision --autogenerate -m "{{message}}"
+
+migration-heads:
+    uv run alembic heads
+
+migration-current:
+    uv run alembic current
+
+migration-downgrade revision="base":
+    uv run alembic downgrade "{{revision}}"
+
+migration-check:
+    uv run alembic check
