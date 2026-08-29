@@ -156,7 +156,6 @@ jobs:
           --health-timeout 3s
           --health-retries 10
     env:
-      EKUMIDAYOMI_APP_ENV: test
       EKUMIDAYOMI_DATABASE_URL: postgresql+asyncpg://ekumidayomi:ci-only@localhost:5432/postgres
       EKUMIDAYOMI_TEST_DATABASE_URL: postgresql+asyncpg://ekumidayomi:ci-only@localhost:5432/ekumidayomi_coverage
       EKUMIDAYOMI_REDIS_URL: redis://localhost:6379/0
