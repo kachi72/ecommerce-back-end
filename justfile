@@ -24,6 +24,9 @@ run: dev
 lint:
     uv run ruff check src migrations
 
+lint-fix:
+    uv run ruff check --fix .
+
 format:
     uv run ruff format src migrations
 
@@ -41,6 +44,9 @@ test-integration +args="":
 
 test +args="":
     uv run pytest src/ekumidayomi/tests --cov=ekumidayomi --cov-report=term-missing --cov-report=html {{args}}
+
+coverage +args="":
+    uv run pytest src/ekumidayomi/tests --cov=ekumidayomi --cov-report=term-missing {{args}}
 
 check: lint format-check typecheck test
 
@@ -82,6 +88,10 @@ migration-downgrade revision="base":
 migration-check:
     uv run alembic check
 
+migration-integrity: migration-heads migrate migration-check
+
+ci: lint format-check typecheck test migration-integrity
+
 containers-build:
     docker compose build app
 
@@ -105,4 +115,5 @@ container-migrate:
 
 container-smoke:
     docker compose up --build --wait --wait-timeout 120 -d postgres redis app
+    docker compose exec -T app python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live', timeout=3)"
     docker compose exec -T app python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready', timeout=3)"
