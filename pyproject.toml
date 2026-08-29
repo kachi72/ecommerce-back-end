@@ -59,12 +59,15 @@ addopts = "-ra --strict-config --strict-markers"
 asyncio_mode = "auto"
 testpaths = ["src/ekumidayomi/tests"]
 markers = [
+  "unit: fast test that requires no external infrastructure",
   "integration: requires isolated PostgreSQL and Redis-compatible infrastructure",
+  "critical_flow: cross-domain customer or administrator journey",
 ]
 
 [tool.coverage.run]
 branch = true
 source = ["ekumidayomi"]
+omit = ["src/ekumidayomi/tests/*"]
 
 [tool.coverage.report]
 fail_under = 80
