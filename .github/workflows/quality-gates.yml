@@ -1,0 +1,183 @@
+name: Quality gates
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.10.8"
+
+jobs:
+  ruff:
+    name: Ruff lint and format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install locked development dependencies
+        run: uv sync --frozen --group dev
+      - name: Lint
+        run: uv run ruff check src migrations
+      - name: Check formatting
+        run: uv run ruff format --check src migrations
+
+  mypy:
+    name: Mypy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install locked development dependencies
+        run: uv sync --frozen --group dev
+      - name: Type check
+        run: uv run mypy
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install locked development dependencies
+        run: uv sync --frozen --group dev
+      - name: Run infrastructure-free unit tests
+        run: uv run pytest -m "not integration" src/ekumidayomi/tests
+
+  integration-tests:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: ekumidayomi_ci
+          POSTGRES_USER: ekumidayomi
+          POSTGRES_PASSWORD: ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ekumidayomi -d ekumidayomi_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      EKUMIDAYOMI_APP_ENV: test
+      EKUMIDAYOMI_DATABASE_URL: postgresql+asyncpg://ekumidayomi:ci-only@localhost:5432/postgres
+      EKUMIDAYOMI_TEST_DATABASE_URL: postgresql+asyncpg://ekumidayomi:ci-only@localhost:5432/ekumidayomi_ci
+      EKUMIDAYOMI_REDIS_URL: redis://localhost:6379/0
+      EKUMIDAYOMI_SECRET_KEY: ci-only-secret
+      EKUMIDAYOMI_ALLOWED_HOSTS: '["testserver"]'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install locked development dependencies
+        run: uv sync --frozen --group dev
+      - name: Run PostgreSQL-backed integration tests
+        run: uv run pytest -m integration src/ekumidayomi/tests
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: ekumidayomi_coverage
+          POSTGRES_USER: ekumidayomi
+          POSTGRES_PASSWORD: ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ekumidayomi -d ekumidayomi_coverage"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      EKUMIDAYOMI_DATABASE_URL: postgresql+asyncpg://ekumidayomi:ci-only@localhost:5432/postgres
+      EKUMIDAYOMI_TEST_DATABASE_URL: postgresql+asyncpg://ekumidayomi:ci-only@localhost:5432/ekumidayomi_coverage
+      EKUMIDAYOMI_REDIS_URL: redis://localhost:6379/0
+      EKUMIDAYOMI_SECRET_KEY: ci-only-secret
+      EKUMIDAYOMI_ALLOWED_HOSTS: '["testserver"]'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install locked development dependencies
+        run: uv sync --frozen --group dev
+      - name: Enforce application coverage
+        run: >-
+          uv run pytest src/ekumidayomi/tests
+          --cov=ekumidayomi
+          --cov-report=term-missing
+          --cov-fail-under=80
