@@ -1,0 +1,45 @@
+name: Documentation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/docs.yml"
+      - "docs/**"
+      - "README.md"
+      - "justfile"
+      - "pyproject.toml"
+      - "uv.lock"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.10.8"
+          enable-cache: true
+      - name: Install locked development dependencies
+        run: uv sync --frozen --group dev
+      - name: Build documentation with warnings as errors
+        run: uv run sphinx-build -W --keep-going -b html docs docs/_build/html
+      - name: Check documentation links
+        run: uv run sphinx-build -W --keep-going -b linkcheck docs docs/_build/linkcheck
+

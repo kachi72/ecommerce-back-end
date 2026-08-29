@@ -90,7 +90,14 @@ migration-check:
 
 migration-integrity: migration-heads migrate migration-check
 
-ci: lint format-check typecheck test migration-integrity
+docs:
+    uv run sphinx-build -b html docs docs/_build/html
+
+docs-check:
+    uv run sphinx-build -W --keep-going -b html docs docs/_build/html
+    uv run sphinx-build -W --keep-going -b linkcheck docs docs/_build/linkcheck
+
+ci: lint format-check typecheck test migration-integrity docs-check
 
 containers-build:
     docker compose build app

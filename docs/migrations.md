@@ -12,6 +12,7 @@ just migration-current
 just migrate
 just migration "short description"
 just migration-check
+just migration-integrity
 just migration-downgrade base
 ```
 
@@ -20,6 +21,7 @@ just migration-downgrade base
 - `migrate` upgrades the configured database to the latest revision.
 - `migration` autogenerates a candidate revision from ORM metadata changes.
 - `migration-check` fails when ORM metadata differs from the migration chain.
+- `migration-integrity` requires one head, upgrades the active database, and checks for drift.
 - `migration-downgrade` defaults to `base`; pass a specific revision when a narrower rollback is required.
 
 ## Host and container URLs
@@ -61,6 +63,9 @@ The Sprint 0 baseline is intentionally empty. It creates no customer, product, i
 
 Do not merge a change that introduces an unintended second head. Rebase the migration on the current head or create a reviewed merge revision when two already-deployed branches genuinely require one. CI must assert that the repository has exactly one head.
 
+The `Migration integrity` workflow repeats this check against a clean PostgreSQL 17 service,
+upgrades that database to `head`, confirms the current revision, and runs `alembic check`.
+
 ## Production safety
 
 - Never edit a revision that has been deployed. Add a corrective revision.
@@ -68,4 +73,8 @@ Do not merge a change that introduces an unintended second head. Rebase the migr
 - Coordinate destructive or non-reversible operations with a backup, compatibility window, data-migration plan, and rollback decision.
 - Prefer expand/migrate/contract sequencing for changes that must remain compatible with a previous application version.
 - Run production migrations exactly once through the release workflow rather than from every application replica.
+- Deploy expand-compatible schema changes before application code that depends on them. Complete
+  backfills before a later release removes compatibility columns or constraints.
+- Roll back application code independently when possible. A database downgrade is permitted only
+  when the reviewed migration and recovery plan prove it is safe for already-written data.
 - Keep credentials and complete connection URLs out of logs, pull requests, screenshots, and command output.

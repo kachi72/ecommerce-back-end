@@ -30,7 +30,7 @@ The example contains development-only placeholders. Review the database and Redi
 
 Example list values:
 
-```dotenv
+```text
 EKUMIDAYOMI_ALLOWED_HOSTS=["api.example.com"]
 EKUMIDAYOMI_CORS_ORIGINS=["https://shop.example.com"]
 ```
@@ -82,19 +82,31 @@ EKUMIDAYOMI_CORS_ORIGINS=["https://shop.example.com"]
 | `EKUMIDAYOMI_REDIS_OPERATION_TIMEOUT_SECONDS` | Public | No | Bounded Redis command timeout; greater than 0 and no more than 30 seconds. |
 | `EKUMIDAYOMI_CHECK_DEPENDENCIES_ON_STARTUP` | Public | No | When true, startup will fail if a required dependency cannot be reached. |
 
+## Container entrypoint setting
+
+`RUN_MIGRATIONS_ON_STARTUP` is consumed by `docker-entrypoint.sh`, not by the typed application
+settings object. It defaults to `false`. Local Compose sets it to `true` for the single
+development application container so the database reaches `head` before Uvicorn starts.
+
+Production and multi-replica environments must set it to `false` and execute `alembic upgrade
+head` exactly once in a separate release step. Running migrations concurrently from every API
+replica is unsupported.
+
 ## Host and container database names
 
 The `.env.example` URLs use `localhost` because they are intended for an API or Alembic command running directly on the developer machine.
 
 When the API or Alembic runs inside Docker Compose, use Compose service names and container ports instead:
 
-```dotenv
+```text
 EKUMIDAYOMI_DATABASE_URL=postgresql+asyncpg://ekumidayomi:development-only@postgres:5432/ekumidayomi
 EKUMIDAYOMI_TEST_DATABASE_URL=postgresql+asyncpg://ekumidayomi:test-only@postgres-test:5432/ekumidayomi_test
 EKUMIDAYOMI_REDIS_URL=redis://redis:6379/0
 ```
 
-Do not copy container hostnames into a host-run `.env`; names such as `postgres` and `redis` resolve only on the Compose network. S0-008 will define these service names and override the host-oriented defaults.
+Do not copy container hostnames into a host-run `.env`; names such as `postgres` and `redis`
+resolve only on the Compose network. `compose.yml` owns these service-name overrides while
+`.env.example` remains host-oriented.
 
 ## HTTP security implications
 
