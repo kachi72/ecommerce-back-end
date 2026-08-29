@@ -57,3 +57,5 @@ transport concerns do not leak into domain services.
 See [ADR 0001](adr/0001-production-infrastructure.md) for the status of the production
 infrastructure decision.
 
+No provider-specific adapter or production resource may be implemented until ADR 0001 is
+accepted.

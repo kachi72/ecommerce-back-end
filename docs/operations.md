@@ -52,9 +52,13 @@ them exactly once as a separate release step.
 - Third-party provider behavior is not part of the Sprint 0 runtime and must not be inferred from
   these health checks.
 
-## Production decision
+## Deployment decision gate
 
-[ADR 0001](adr/0001-production-infrastructure.md) is pending S0-012. Production provisioning,
-backup and recovery objectives, alert ownership, regions, scaling, and release ownership remain
-unapproved until that ADR is completed and accepted.
+[ADR 0001](adr/0001-production-infrastructure.md) is proposed. It conditionally prefers an Azure
+managed platform in South Africa North and retains AWS Cape Town as the primary fallback.
+Production provisioning remains blocked until provider, region, SKU, latency, cost, capacity,
+recovery, security, privacy, and ownership gates are approved.
 
+Azure Cache for Redis must not be selected for a new deployment because it is on a published
+retirement path. The proposal uses Azure Managed Redis and requires its region, SKU, private
+networking, clustering, and application-client compatibility to be verified before acceptance.
