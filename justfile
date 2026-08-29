@@ -33,14 +33,14 @@ format-check:
 typecheck:
     uv run mypy
 
-test-unit:
-    uv run pytest -m "not integration"
+test-unit +args="":
+    uv run pytest -m "not integration" src/ekumidayomi/tests {{args}}
 
-test-integration:
-    uv run pytest -m integration
+test-integration +args="":
+    uv run pytest -m integration src/ekumidayomi/tests {{args}}
 
 test +args="":
-    uv run pytest --cov=ekumidayomi --cov-report=term-missing {{args}}
+    uv run pytest src/ekumidayomi/tests --cov=ekumidayomi --cov-report=term-missing --cov-report=html {{args}}
 
 check: lint format-check typecheck test
 

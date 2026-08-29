@@ -8,11 +8,15 @@ __pycache__/
 .venv/
 .idea/
 .vscode/
+
+# buold docs
 build/
 dist/
 htmlcov/
 docs/_build/
 *.egg-info/
+
+# personal docs
 *plans/
 *prs/
 *changes/
