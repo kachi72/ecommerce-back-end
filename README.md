@@ -70,3 +70,14 @@ just containers-down
 `containers-down` stops the stack without deleting its named volumes. Development and test PostgreSQL use different databases and different volumes.
 
 The local Compose app enables `RUN_MIGRATIONS_ON_STARTUP` for one development replica. Do not enable startup migrations in a multi-replica or production deployment. Production migrations must run exactly once as a separate release step defined by the later deployment workflow.
+
+## Quality checks
+
+Run `just check` for the local code and test gates. Run `just docs-check` for strict documentation
+validation and `just container-smoke` for the production-image smoke test.
+
+## Documentation
+
+Build the technical documentation with `just docs`, then open
+`docs/_build/html/index.html`. The generated site is a local build artifact and must not be
+committed.
