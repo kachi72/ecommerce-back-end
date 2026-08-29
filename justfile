@@ -81,3 +81,28 @@ migration-downgrade revision="base":
 
 migration-check:
     uv run alembic check
+
+containers-build:
+    docker compose build app
+
+containers-up:
+    docker compose up --build --wait --wait-timeout 120 -d
+
+containers-up-deps:
+    docker compose up --wait --wait-timeout 120 -d postgres postgres-test redis
+
+containers-down:
+    docker compose down
+
+containers-status:
+    docker compose ps
+
+containers-logs service="app":
+    docker compose logs --follow {{service}}
+
+container-migrate:
+    docker compose run --rm -e RUN_MIGRATIONS_ON_STARTUP=false app alembic upgrade head
+
+container-smoke:
+    docker compose up --build --wait --wait-timeout 120 -d postgres redis app
+    docker compose exec -T app python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready', timeout=3)"
