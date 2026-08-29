@@ -13,3 +13,8 @@ dist/
 htmlcov/
 docs/_build/
 *.egg-info/
+*plans/
+*prs/
+*changes/
+*roadmap
+*roadman-eg/

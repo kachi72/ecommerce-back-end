@@ -38,4 +38,35 @@ uv sync --frozen
 just run
 ```
 
-The remaining database, migration, container, and operations commands are introduced by their later Sprint 0 issues.
+The remaining database, migration, and operations commands are introduced by their later Sprint 0 issues.
+
+## Containers
+
+Build and start the API, development PostgreSQL, isolated test PostgreSQL, and Redis:
+
+```shell
+just containers-up
+```
+
+Open `http://localhost:8000/docs` for the API documentation. The container is ready when `http://localhost:8000/health/ready` returns `200`.
+
+The local services publish these ports:
+
+- API: `8000`
+- Development PostgreSQL: `5432`
+- Test PostgreSQL: `5433`
+- Redis: `6379`
+
+Useful commands:
+
+```shell
+just containers-status
+just containers-logs
+just container-migrate
+just container-smoke
+just containers-down
+```
+
+`containers-down` stops the stack without deleting its named volumes. Development and test PostgreSQL use different databases and different volumes.
+
+The local Compose app enables `RUN_MIGRATIONS_ON_STARTUP` for one development replica. Do not enable startup migrations in a multi-replica or production deployment. Production migrations must run exactly once as a separate release step defined by the later deployment workflow.
