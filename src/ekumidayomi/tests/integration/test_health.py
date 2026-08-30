@@ -77,9 +77,11 @@ async def test_readiness_failure_is_safe(
     expected_checks[failed_dependency] = "failed"
     assert response.status_code == 503
     assert response.json() == {
-        "detail": {
+        "error": {
             "code": "service_not_ready",
-            "checks": expected_checks,
+            "message": "Service is not ready",
+            "details": {"checks": expected_checks},
+            "request_id": response.headers["x-request-id"],
         }
     }
     assert "private" not in response.text
