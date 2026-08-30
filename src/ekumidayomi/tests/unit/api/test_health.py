@@ -8,6 +8,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
+from ekumidayomi.api.errors import register_error_handlers
 from ekumidayomi.api.health import router
 
 
@@ -21,6 +22,7 @@ def build_health_app(database: MagicMock, redis: MagicMock) -> FastAPI:
         yield
 
     application = FastAPI(lifespan=lifespan)
+    register_error_handlers(application)
     application.include_router(router)
     return application
 
@@ -89,9 +91,11 @@ async def test_readiness_safely_reports_postgresql_failure() -> None:
 
     assert response.status_code == 503
     assert response.json() == {
-        "detail": {
+        "error": {
             "code": "service_not_ready",
-            "checks": {"postgresql": "failed", "redis": "ok"},
+            "message": "Service is not ready",
+            "details": {"checks": {"postgresql": "failed", "redis": "ok"}},
+            "request_id": response.headers["x-request-id"],
         }
     }
     assert "password" not in response.text
@@ -116,9 +120,11 @@ async def test_readiness_safely_reports_redis_failure() -> None:
 
     assert response.status_code == 503
     assert response.json() == {
-        "detail": {
+        "error": {
             "code": "service_not_ready",
-            "checks": {"postgresql": "ok", "redis": "failed"},
+            "message": "Service is not ready",
+            "details": {"checks": {"postgresql": "ok", "redis": "failed"}},
+            "request_id": response.headers["x-request-id"],
         }
     }
     assert "password" not in response.text

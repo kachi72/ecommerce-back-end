@@ -2,10 +2,11 @@
 
 from typing import Literal, cast
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from redis.asyncio import Redis
 
+from ekumidayomi.core.errors import DependencyUnavailableError
 from ekumidayomi.core.redis import check_redis_connection
 from ekumidayomi.db.session import Database
 
@@ -51,9 +52,10 @@ async def ready(request: Request) -> ReadinessResponse:
         checks["redis"] = "failed"
 
     if "failed" in checks.values():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={"code": "service_not_ready", "checks": checks},
+        raise DependencyUnavailableError(
+            code="service_not_ready",
+            message="Service is not ready",
+            details={"checks": checks},
         )
 
     return ReadinessResponse(
