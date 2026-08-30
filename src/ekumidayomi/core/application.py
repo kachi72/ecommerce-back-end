@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from ekumidayomi import __version__
+from ekumidayomi.api.errors import register_error_handlers
 from ekumidayomi.api.health import router as health_router
 from ekumidayomi.api.v1.router import router as api_v1_router
 from ekumidayomi.core.redis import (
@@ -55,6 +56,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         debug=resolved_settings.debug,
         lifespan=lifespan,
     )
+    register_error_handlers(application)
     application.add_middleware(
         TrustedHostMiddleware,
         allowed_hosts=resolved_settings.allowed_hosts,
