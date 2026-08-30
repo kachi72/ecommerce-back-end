@@ -30,8 +30,9 @@ async def set_search_path(connection: AsyncConnection, search_path: str) -> None
 
 
 @pytest.fixture
-async def database_session(test_settings: Settings) -> AsyncIterator[AsyncSession]:
-    """Provide a session inside a unique disposable PostgreSQL schema."""
+async def database_connection(test_settings: Settings) -> AsyncIterator[AsyncConnection]:
+    """Provide one connection inside a unique disposable PostgreSQL schema."""
+
     schema = f"test_{uuid4().hex}"
     engine = create_async_engine(test_settings.test_database_url, poolclass=NullPool)
 
@@ -46,7 +47,6 @@ async def database_session(test_settings: Settings) -> AsyncIterator[AsyncSessio
             )
 
         schema_created = False
-        session: AsyncSession | None = None
         try:
             await connection.execute(CreateSchema(schema))
             await connection.commit()
@@ -57,14 +57,9 @@ async def database_session(test_settings: Settings) -> AsyncIterator[AsyncSessio
             await set_search_path(connection, f'"{schema}", public')
             await connection.run_sync(Base.metadata.create_all)
             await connection.commit()
-            session = AsyncSession(bind=connection, expire_on_commit=False)
 
-            yield session
+            yield connection
         finally:
-            if session is not None:
-                if session.in_transaction():
-                    await session.rollback()
-                await session.close()
             if connection.in_transaction():
                 await connection.rollback()
             if schema_created:
@@ -74,6 +69,19 @@ async def database_session(test_settings: Settings) -> AsyncIterator[AsyncSessio
             await connection.close()
     finally:
         await engine.dispose()
+
+
+@pytest.fixture
+async def database_session(database_connection: AsyncConnection) -> AsyncIterator[AsyncSession]:
+    """Provide a session on the isolated PostgreSQL test connection."""
+
+    session = AsyncSession(bind=database_connection, expire_on_commit=False)
+    try:
+        yield session
+    finally:
+        if session.in_transaction():
+            await session.rollback()
+        await session.close()
 
 
 @pytest.fixture
