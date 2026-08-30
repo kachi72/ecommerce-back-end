@@ -23,7 +23,10 @@ class Database:
             pool_pre_ping=True,
             pool_size=settings.database_pool_size,
             max_overflow=settings.database_max_overflow,
-            connect_args={"timeout": settings.database_connect_timeout_seconds},
+            connect_args={
+                "timeout": settings.database_connect_timeout_seconds,
+                "server_settings": {"timezone": "UTC"},
+            },
         )
         self.session_factory = async_sessionmaker(
             bind=self.engine,

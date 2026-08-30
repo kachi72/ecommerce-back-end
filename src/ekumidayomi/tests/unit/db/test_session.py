@@ -36,7 +36,10 @@ def test_database_uses_active_url_and_bounded_pool_settings(
         pool_pre_ping=True,
         pool_size=7,
         max_overflow=3,
-        connect_args={"timeout": 4.0},
+        connect_args={
+            "timeout": 4.0,
+            "server_settings": {"timezone": "UTC"},
+        },
     )
     create_session_factory.assert_called_once_with(
         bind=engine,

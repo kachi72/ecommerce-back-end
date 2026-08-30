@@ -29,3 +29,10 @@ def test_baseline_has_no_parent_or_domain_tables() -> None:
     assert baseline is not None
     assert baseline.down_revision is None
     assert Base.metadata.tables == {}
+
+
+def test_orm_mixins_do_not_require_a_schema_revision() -> None:
+    script = get_script_directory()
+
+    assert script.get_current_head() == "0001_sprint0_baseline"
+    assert Base.metadata.tables == {}

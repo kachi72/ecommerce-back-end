@@ -47,6 +47,21 @@ Never change a tracked URL to contain a real credential. Select the environment 
 
 Autogeneration is a draft, not an approval mechanism. It may miss renames, data transformations, partial indexes, constraint intent, and safe deployment sequencing.
 
+## ORM conventions
+
+- Domain models use `UUIDPrimaryKeyMixin` for PostgreSQL-native UUID4 primary keys.
+- Mutable domain models use `TimestampMixin` for non-null, timezone-aware `created_at` and `updated_at` values generated from PostgreSQL time.
+- Archiving and deactivation are explicit opt-in fields through `ArchivedAtMixin` and `DeactivatedAtMixin`; there is no universal `deleted_at` column or hidden global query filter.
+- Every string column declares an intentional maximum length unless the owning domain documents why unbounded text is required.
+- Required values declare `nullable=False`, and database-generated values declare reviewed server defaults.
+- Unique behavior uses explicit constraints rather than application-only checks.
+- Every foreign key declares its intended update/delete behavior; destructive cascades require domain ownership and tests.
+- Indexes must support a named query, ordering, constraint, or concurrency requirement. Do not index every foreign key or low-selectivity state field automatically.
+- Multi-column indexes and constraints follow query and selectivity order, and deterministic metadata names include every participating column.
+- Check constraints are explicitly named so Alembic can produce stable `ck_<table>_<constraint>` identifiers.
+
+The mixins register no tables on `Base.metadata`, so introducing or changing an abstract convention alone does not require an Alembic revision. Domain tables adopt these conventions and add migrations in their owning sprint.
+
 ## Applying and verifying migrations
 
 For each revision:
