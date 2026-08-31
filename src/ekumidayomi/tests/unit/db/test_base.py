@@ -5,22 +5,9 @@ from datetime import datetime
 from typing import Protocol, cast
 from uuid import UUID
 
-from sqlalchemy import (
-    CheckConstraint,
-    DateTime,
-    ForeignKey,
-    ForeignKeyConstraint,
-    Index,
-    Integer,
-    MetaData,
-    String,
-    Table,
-    UniqueConstraint,
-)
+import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy.schema import CreateTable
 
 from ekumidayomi.db.base import (
     NAMING_CONVENTION,
@@ -37,13 +24,13 @@ class DefaultWithArg(Protocol):
 
 
 class ConventionBase(DeclarativeBase):
-    metadata = MetaData(naming_convention=NAMING_CONVENTION)
+    metadata = sa.MetaData(naming_convention=NAMING_CONVENTION)
 
 
 class Parent(UUIDPrimaryKeyMixin, ConventionBase):
     __tablename__ = "convention_parents"
 
-    name: Mapped[str] = mapped_column(String(50), nullable=False)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
 
 
 class ConventionExample(
@@ -55,18 +42,18 @@ class ConventionExample(
 ):
     __tablename__ = "convention_examples"
     __table_args__ = (
-        UniqueConstraint("parent_id", "code"),
-        CheckConstraint("quantity >= 0", name="quantity_non_negative"),
-        Index(None, "parent_id", "code"),
+        sa.UniqueConstraint("parent_id", "code"),
+        sa.CheckConstraint("quantity >= 0", name="quantity_non_negative"),
+        sa.Index(None, "parent_id", "code"),
     )
 
     parent_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True),
-        ForeignKey("convention_parents.id", ondelete="CASCADE"),
+        sa.UUID(as_uuid=True),
+        sa.ForeignKey("convention_parents.id", ondelete="CASCADE"),
         nullable=False,
     )
-    code: Mapped[str] = mapped_column(String(32), nullable=False)
-    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    code: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    quantity: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
 
 
 def test_base_uses_deterministic_constraint_names() -> None:
@@ -81,7 +68,7 @@ def test_base_uses_deterministic_constraint_names() -> None:
 
 
 def test_constraint_and_index_names_include_tables_and_all_columns() -> None:
-    table = cast(Table, ConventionExample.__table__)
+    table = cast(sa.Table, ConventionExample.__table__)
 
     assert table.primary_key.name == "pk_convention_examples"
     assert next(iter(table.indexes)).name == "ix_convention_examples_parent_id_code"
@@ -89,7 +76,7 @@ def test_constraint_and_index_names_include_tables_and_all_columns() -> None:
         next(
             constraint.name
             for constraint in table.constraints
-            if isinstance(constraint, UniqueConstraint)
+            if isinstance(constraint, sa.UniqueConstraint)
         )
         == "uq_convention_examples_parent_id_code"
     )
@@ -97,7 +84,7 @@ def test_constraint_and_index_names_include_tables_and_all_columns() -> None:
         next(
             constraint.name
             for constraint in table.constraints
-            if isinstance(constraint, CheckConstraint)
+            if isinstance(constraint, sa.CheckConstraint)
         )
         == "ck_convention_examples_quantity_non_negative"
     )
@@ -105,17 +92,17 @@ def test_constraint_and_index_names_include_tables_and_all_columns() -> None:
         next(
             constraint.name
             for constraint in table.constraints
-            if isinstance(constraint, ForeignKeyConstraint)
+            if isinstance(constraint, sa.ForeignKeyConstraint)
         )
         == "fk_convention_examples_parent_id_convention_parents"
     )
 
 
 def test_uuid_primary_key_uses_postgresql_uuid4() -> None:
-    table = cast(Table, ConventionExample.__table__)
+    table = cast(sa.Table, ConventionExample.__table__)
     column = table.c.id
 
-    assert isinstance(column.type, PGUUID)
+    assert isinstance(column.type, sa.UUID)
     assert column.type.as_uuid is True
     assert column.primary_key is True
     assert column.nullable is False
@@ -127,12 +114,12 @@ def test_uuid_primary_key_uses_postgresql_uuid4() -> None:
 
 
 def test_timestamps_are_timezone_aware_and_server_generated() -> None:
-    table = cast(Table, ConventionExample.__table__)
+    table = cast(sa.Table, ConventionExample.__table__)
     created_at = table.c.created_at
     updated_at = table.c.updated_at
 
-    assert isinstance(created_at.type, DateTime)
-    assert isinstance(updated_at.type, DateTime)
+    assert isinstance(created_at.type, sa.DateTime)
+    assert isinstance(updated_at.type, sa.DateTime)
     assert created_at.type.timezone is True
     assert updated_at.type.timezone is True
     assert created_at.nullable is False
@@ -146,11 +133,11 @@ def test_timestamps_are_timezone_aware_and_server_generated() -> None:
 
 
 def test_soft_state_is_opt_in_without_global_deleted_at() -> None:
-    table = cast(Table, ConventionExample.__table__)
+    table = cast(sa.Table, ConventionExample.__table__)
     columns = table.c
 
-    assert isinstance(columns.archived_at.type, DateTime)
-    assert isinstance(columns.deactivated_at.type, DateTime)
+    assert isinstance(columns.archived_at.type, sa.DateTime)
+    assert isinstance(columns.deactivated_at.type, sa.DateTime)
     assert columns.archived_at.type.timezone is True
     assert columns.archived_at.nullable is True
     assert columns.deactivated_at.type.timezone is True
@@ -169,9 +156,9 @@ def test_mixins_construct_a_typed_mapper() -> None:
 
 
 def test_postgresql_ddl_uses_native_uuid_and_timestamptz() -> None:
-    table = cast(Table, ConventionExample.__table__)
+    table = cast(sa.Table, ConventionExample.__table__)
     ddl = str(
-        CreateTable(table).compile(
+        sa.schema.CreateTable(table).compile(
             dialect=postgresql.dialect(),  # type: ignore[no-untyped-call]
         )
     )

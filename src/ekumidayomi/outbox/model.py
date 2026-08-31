@@ -4,18 +4,8 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from sqlalchemy import (
-    CheckConstraint,
-    DateTime,
-    Enum,
-    Index,
-    Integer,
-    String,
-    UniqueConstraint,
-    text,
-)
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ekumidayomi.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -31,62 +21,45 @@ class OutboxStatus(StrEnum):
     FAILED = "failed"
 
 
-def outbox_status_values(enum: type[OutboxStatus]) -> list[str]:
-    """Persist enum values rather than Python member names."""
-
-    return [member.value for member in enum]
-
-
 class OutboxMessage(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """A durable intent to publish one domain event."""
 
     __tablename__ = "outbox_messages"
     __table_args__ = (
-        UniqueConstraint("event_id"),
-        UniqueConstraint("idempotency_key"),
-        CheckConstraint("aggregate_version > 0", name="aggregate_version_positive"),
-        CheckConstraint("attempts >= 0", name="attempts_non_negative"),
-        CheckConstraint(
-            "(status = 'processing' AND claimed_at IS NOT NULL AND published_at IS NULL) "
-            "OR (status = 'published' AND claimed_at IS NULL AND published_at IS NOT NULL) "
-            "OR (status IN ('pending', 'failed') AND claimed_at IS NULL AND published_at IS NULL)",
-            name="status_timestamps_consistent",
-        ),
-        Index(None, "status", "available_at"),
-        Index(None, "aggregate_type", "aggregate_id", "aggregate_version"),
+        sa.UniqueConstraint("event_id"),
+        sa.UniqueConstraint("idempotency_key"),
+        sa.CheckConstraint("aggregate_version > 0", name="aggregate_version_positive"),
+        sa.CheckConstraint("attempts >= 0", name="attempts_non_negative"),
+        sa.Index(None, "status", "available_at"),
+        sa.Index(None, "aggregate_type", "aggregate_id", "aggregate_version"),
     )
 
-    event_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
-    idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
-    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
-    aggregate_type: Mapped[str] = mapped_column(String(100), nullable=False)
-    aggregate_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
-    aggregate_version: Mapped[int] = mapped_column(Integer, nullable=False)
-    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    payload: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
-    status: Mapped[OutboxStatus] = mapped_column(
-        Enum(
-            OutboxStatus,
-            name="outbox_status",
-            values_callable=outbox_status_values,
-            validate_strings=True,
-        ),
+    event_id: Mapped[UUID] = mapped_column(sa.UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    event_type: Mapped[str] = mapped_column(sa.String(100), nullable=False)
+    aggregate_type: Mapped[str] = mapped_column(sa.String(100), nullable=False)
+    aggregate_id: Mapped[UUID] = mapped_column(sa.UUID(as_uuid=True), nullable=False)
+    aggregate_version: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
+    payload: Mapped[dict[str, object]] = mapped_column(postgresql.JSONB, nullable=False)
+    status: Mapped[str] = mapped_column(
+        sa.String(20),
         nullable=False,
-        server_default=text("'pending'::outbox_status"),
+        server_default=sa.text("'pending'"),
     )
     attempts: Mapped[int] = mapped_column(
-        Integer,
+        sa.Integer,
         nullable=False,
-        server_default=text("0"),
+        server_default=sa.text("0"),
     )
     available_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        sa.DateTime(timezone=True),
         nullable=False,
-        server_default=text("now()"),
+        server_default=sa.text("now()"),
     )
-    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    last_error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    claimed_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
+    last_error_code: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
 
     def to_event(self) -> DomainEvent:
         """Recreate the provider-neutral event envelope."""

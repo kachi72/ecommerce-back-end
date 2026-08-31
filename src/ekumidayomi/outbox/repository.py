@@ -50,7 +50,7 @@ class OutboxRepository:
             aggregate_version=event.aggregate_version,
             occurred_at=event.occurred_at,
             payload=event.payload_dict(),
-            status=OutboxStatus.PENDING,
+            status=OutboxStatus.PENDING.value,
             attempts=0,
             available_at=resolved_available_at,
         )
@@ -73,13 +73,13 @@ class OutboxRepository:
                 earlier.aggregate_type == OutboxMessage.aggregate_type,
                 earlier.aggregate_id == OutboxMessage.aggregate_id,
                 earlier.aggregate_version < OutboxMessage.aggregate_version,
-                earlier.status != OutboxStatus.PUBLISHED,
+                earlier.status != OutboxStatus.PUBLISHED.value,
             )
         )
         statement = (
             select(OutboxMessage)
             .where(
-                OutboxMessage.status.in_((OutboxStatus.PENDING, OutboxStatus.FAILED)),
+                OutboxMessage.status.in_((OutboxStatus.PENDING.value, OutboxStatus.FAILED.value)),
                 OutboxMessage.attempts < self._max_attempts,
                 OutboxMessage.available_at <= claimed_at,
                 ~earlier_unpublished,
@@ -94,7 +94,7 @@ class OutboxRepository:
         )
         messages = tuple((await self._session.scalars(statement)).all())
         for message in messages:
-            message.status = OutboxStatus.PROCESSING
+            message.status = OutboxStatus.PROCESSING.value
             message.attempts += 1
             message.claimed_at = claimed_at
             message.published_at = None
@@ -111,11 +111,11 @@ class OutboxRepository:
         """Idempotently record successful delivery of a claimed message."""
 
         message = await self._session.get(OutboxMessage, message_id, with_for_update=True)
-        if message is None or message.status is OutboxStatus.PUBLISHED:
+        if message is None or message.status == OutboxStatus.PUBLISHED.value:
             return False
-        if message.status is not OutboxStatus.PROCESSING:
+        if message.status != OutboxStatus.PROCESSING.value:
             return False
-        message.status = OutboxStatus.PUBLISHED
+        message.status = OutboxStatus.PUBLISHED.value
         message.claimed_at = None
         message.published_at = require_utc(published_at or utc_now())
         message.last_error_code = None
@@ -134,9 +134,9 @@ class OutboxRepository:
         _validate_error_code(error_code)
         next_available_at = require_utc(available_at)
         message = await self._session.get(OutboxMessage, message_id, with_for_update=True)
-        if message is None or message.status is not OutboxStatus.PROCESSING:
+        if message is None or message.status != OutboxStatus.PROCESSING.value:
             return False
-        message.status = OutboxStatus.FAILED
+        message.status = OutboxStatus.FAILED.value
         message.claimed_at = None
         message.published_at = None
         message.last_error_code = error_code
@@ -159,7 +159,7 @@ class OutboxRepository:
         statement = (
             select(OutboxMessage)
             .where(
-                OutboxMessage.status == OutboxStatus.PROCESSING,
+                OutboxMessage.status == OutboxStatus.PROCESSING.value,
                 OutboxMessage.claimed_at <= resolved_stale_before,
             )
             .order_by(OutboxMessage.claimed_at, OutboxMessage.id)
@@ -168,7 +168,7 @@ class OutboxRepository:
         )
         messages = tuple((await self._session.scalars(statement)).all())
         for message in messages:
-            message.status = OutboxStatus.FAILED
+            message.status = OutboxStatus.FAILED.value
             message.claimed_at = None
             message.published_at = None
             message.last_error_code = "claim_expired"

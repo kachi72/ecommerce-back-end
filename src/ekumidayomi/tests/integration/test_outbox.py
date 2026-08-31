@@ -175,4 +175,4 @@ async def test_failed_delivery_is_visible_and_retryable(
         assert await repository.claim_batch(now=retry_at - timedelta(seconds=1)) == ()
         retried = (await repository.claim_batch(now=retry_at))[0]
         assert retried.attempts == 2
-        assert retried.status is OutboxStatus.PROCESSING
+        assert retried.status == OutboxStatus.PROCESSING.value
