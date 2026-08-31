@@ -9,6 +9,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from ekumidayomi.core.settings import get_settings
 from ekumidayomi.db.base import Base
+from ekumidayomi.outbox.model import OutboxMessage
+
+_REGISTERED_MODELS = (OutboxMessage,)
 
 config = context.config
 
