@@ -135,15 +135,11 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint(
             "aggregate_version > 0",
-            name=op.f(
-                "ck_outbox_messages_aggregate_version_positive"
-            ),
+            name=op.f("ck_outbox_messages_aggregate_version_positive"),
         ),
         sa.CheckConstraint(
             "attempts >= 0",
-            name=op.f(
-                "ck_outbox_messages_attempts_non_negative"
-            ),
+            name=op.f("ck_outbox_messages_attempts_non_negative"),
         ),
         sa.CheckConstraint(
             "("
@@ -159,9 +155,7 @@ def upgrade() -> None:
             "AND claimed_at IS NULL "
             "AND published_at IS NULL"
             ")",
-            name=op.f(
-                "ck_outbox_messages_status_timestamps_consistent"
-            ),
+            name=op.f("ck_outbox_messages_status_timestamps_consistent"),
         ),
         sa.PrimaryKeyConstraint(
             "id",
@@ -173,17 +167,12 @@ def upgrade() -> None:
         ),
         sa.UniqueConstraint(
             "idempotency_key",
-            name=op.f(
-                "uq_outbox_messages_idempotency_key"
-            ),
+            name=op.f("uq_outbox_messages_idempotency_key"),
         ),
     )
 
     op.create_index(
-        op.f(
-            "ix_outbox_messages_aggregate_type_"
-            "aggregate_id_aggregate_version"
-        ),
+        op.f("ix_outbox_messages_aggregate_type_aggregate_id_aggregate_version"),
         "outbox_messages",
         [
             "aggregate_type",
@@ -194,9 +183,7 @@ def upgrade() -> None:
     )
 
     op.create_index(
-        op.f(
-            "ix_outbox_messages_status_available_at"
-        ),
+        op.f("ix_outbox_messages_status_available_at"),
         "outbox_messages",
         [
             "status",
@@ -210,17 +197,12 @@ def downgrade() -> None:
     """Remove the outbox table, indexes, and PostgreSQL enum."""
 
     op.drop_index(
-        op.f(
-            "ix_outbox_messages_status_available_at"
-        ),
+        op.f("ix_outbox_messages_status_available_at"),
         table_name="outbox_messages",
     )
 
     op.drop_index(
-        op.f(
-            "ix_outbox_messages_aggregate_type_"
-            "aggregate_id_aggregate_version"
-        ),
+        op.f("ix_outbox_messages_aggregate_type_aggregate_id_aggregate_version"),
         table_name="outbox_messages",
     )
 

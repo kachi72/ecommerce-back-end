@@ -20,13 +20,13 @@ def get_script_directory() -> ScriptDirectory:
 def test_migration_chain_has_exactly_one_platform_head() -> None:
     script = get_script_directory()
 
-    assert script.get_heads() == ["0002_platform_outbox"]
+    assert script.get_heads() == ["1118b82ffb5c"]
     assert script.get_base() == "0001_sprint0_baseline"
 
 
 def test_baseline_has_no_parent_and_outbox_follows_it() -> None:
     baseline = get_script_directory().get_revision("0001_sprint0_baseline")
-    outbox = get_script_directory().get_revision("0002_platform_outbox")
+    outbox = get_script_directory().get_revision("1118b82ffb5c")
 
     assert baseline is not None
     assert baseline.down_revision is None
@@ -37,6 +37,6 @@ def test_baseline_has_no_parent_and_outbox_follows_it() -> None:
 def test_outbox_is_the_only_registered_platform_table() -> None:
     script = get_script_directory()
 
-    assert script.get_current_head() == "0002_platform_outbox"
+    assert script.get_current_head() == "1118b82ffb5c"
     assert OutboxMessage.__tablename__ == "outbox_messages"
     assert set(Base.metadata.tables) == {"outbox_messages"}
