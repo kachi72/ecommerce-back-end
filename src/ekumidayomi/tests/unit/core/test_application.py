@@ -210,3 +210,23 @@ async def test_wildcard_cors_does_not_allow_credentials() -> None:
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "*"
     assert "access-control-allow-credentials" not in response.headers
+
+
+@pytest.mark.asyncio
+async def test_api_root_is_versioned_while_health_routes_are_unversioned() -> None:
+    app = create_app(Settings(_env_file=None, check_dependencies_on_startup=False))
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        api_response = await client.get("/api/v1/")
+        health_response = await client.get("/health/live")
+        versioned_health_response = await client.get("/api/v1/health/live")
+        openapi_response = await client.get("/openapi.json")
+
+    assert api_response.status_code == 200
+    assert api_response.json() == {"name": "Ẹkúmidáyọ̀mí API", "version": "v1"}
+    assert health_response.status_code == 200
+    assert versioned_health_response.status_code == 404
+    assert "/api/v1/" not in openapi_response.json()["paths"]
