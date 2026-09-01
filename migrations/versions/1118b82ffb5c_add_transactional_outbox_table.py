@@ -16,30 +16,9 @@ down_revision: str | Sequence[str] | None = "0001_sprint0_baseline"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-OUTBOX_STATUSES = (
-    "pending",
-    "processing",
-    "published",
-    "failed",
-)
-
-outbox_status_enum = postgresql.ENUM(
-    *OUTBOX_STATUSES,
-    name="outbox_status",
-    create_type=False,
-)
-
 
 def upgrade() -> None:
     """Create durable event-intent storage and its claim indexes."""
-
-    postgresql.ENUM(
-        *OUTBOX_STATUSES,
-        name="outbox_status",
-    ).create(
-        op.get_bind(),
-        checkfirst=False,
-    )
 
     op.create_table(
         "outbox_messages",
@@ -90,8 +69,8 @@ def upgrade() -> None:
         ),
         sa.Column(
             "status",
-            outbox_status_enum,
-            server_default=sa.text("'pending'::outbox_status"),
+            sa.String(length=20),
+            server_default=sa.text("'pending'"),
             nullable=False,
         ),
         sa.Column(
@@ -141,22 +120,6 @@ def upgrade() -> None:
             "attempts >= 0",
             name=op.f("ck_outbox_messages_attempts_non_negative"),
         ),
-        sa.CheckConstraint(
-            "("
-            "status = 'processing' "
-            "AND claimed_at IS NOT NULL "
-            "AND published_at IS NULL"
-            ") OR ("
-            "status = 'published' "
-            "AND claimed_at IS NULL "
-            "AND published_at IS NOT NULL"
-            ") OR ("
-            "status IN ('pending', 'failed') "
-            "AND claimed_at IS NULL "
-            "AND published_at IS NULL"
-            ")",
-            name=op.f("ck_outbox_messages_status_timestamps_consistent"),
-        ),
         sa.PrimaryKeyConstraint(
             "id",
             name=op.f("pk_outbox_messages"),
@@ -194,7 +157,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Remove the outbox table, indexes, and PostgreSQL enum."""
+    """Remove the outbox table and indexes."""
 
     op.drop_index(
         op.f("ix_outbox_messages_status_available_at"),
@@ -207,8 +170,3 @@ def downgrade() -> None:
     )
 
     op.drop_table("outbox_messages")
-
-    outbox_status_enum.drop(
-        op.get_bind(),
-        checkfirst=False,
-    )

@@ -44,7 +44,7 @@ def message(status: OutboxStatus = OutboxStatus.PENDING) -> OutboxMessage:
         aggregate_version=1,
         occurred_at=NOW,
         payload={"version": 1},
-        status=status,
+        status=status.value,
         attempts=0,
         available_at=NOW,
     )
@@ -70,7 +70,7 @@ def test_add_stages_json_safe_message_without_committing() -> None:
 
     assert result.idempotency_key == f"event:{domain_event.event_id}"
     assert result.payload == {"version": 1}
-    assert result.status is OutboxStatus.PENDING
+    assert result.status == OutboxStatus.PENDING.value
     session.add.assert_called_once_with(result)
     session.commit.assert_not_awaited()
 
@@ -91,7 +91,7 @@ async def test_claim_batch_uses_skip_locked_and_transitions_messages() -> None:
     result = await OutboxRepository(session, max_attempts=3).claim_batch(limit=2, now=NOW)
 
     assert result == (claimed,)
-    assert claimed.status is OutboxStatus.PROCESSING
+    assert claimed.status == OutboxStatus.PROCESSING.value
     assert claimed.attempts == 1
     assert claimed.claimed_at == NOW
     statement = session.scalars.await_args.args[0]
@@ -122,7 +122,7 @@ async def test_publish_is_idempotent() -> None:
     repository = OutboxRepository(session)
 
     assert await repository.mark_published(claimed.id, published_at=NOW)
-    assert claimed.status is OutboxStatus.PUBLISHED
+    assert claimed.status == OutboxStatus.PUBLISHED.value
     assert not await repository.mark_published(claimed.id, published_at=NOW)
 
 
@@ -142,7 +142,7 @@ async def test_failed_message_is_retained_for_retry() -> None:
     assert await OutboxRepository(session).mark_failed(
         claimed.id, error_code="provider_unavailable", available_at=later
     )
-    assert claimed.status is OutboxStatus.FAILED
+    assert claimed.status == OutboxStatus.FAILED.value
     assert claimed.available_at == later
     assert claimed.last_error_code == "provider_unavailable"
 
@@ -168,6 +168,6 @@ async def test_stale_claims_are_recoverable_without_deletion() -> None:
     )
 
     assert count == 1
-    assert claimed.status is OutboxStatus.FAILED
+    assert claimed.status == OutboxStatus.FAILED.value
     assert claimed.last_error_code == "claim_expired"
     session.delete.assert_not_awaited()
