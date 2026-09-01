@@ -117,6 +117,12 @@ containers-status:
 containers-logs service="app":
     docker compose logs --follow {{service}}
 
+heads:
+    uv run alembic heads
+
+current:
+    uv run alembic current
+
 container-migrate:
     docker compose run --rm -e RUN_MIGRATIONS_ON_STARTUP=false app alembic upgrade head
 
