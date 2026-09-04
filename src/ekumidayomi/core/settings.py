@@ -3,7 +3,7 @@
 from enum import StrEnum
 from functools import lru_cache
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import AnyHttpUrl, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +11,19 @@ class AppEnvironment(StrEnum):
     DEVELOPMENT = "development"
     TEST = "test"
     PRODUCTION = "production"
+
+
+class LogLevel(StrEnum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+
+class LogFormat(StrEnum):
+    JSON = "json"
+    CONSOLE = "console"
 
 
 class Settings(BaseSettings):
@@ -28,6 +41,16 @@ class Settings(BaseSettings):
     app_name: str = "Ẹkúmidáyọ̀mí API"
     debug: bool = False
     api_prefix: str = "/api/v1"
+    service_name: str = Field(
+        default="ekumidayomi-api",
+        min_length=1,
+        max_length=100,
+        pattern=r"^[a-z][a-z0-9-]*$",
+    )
+    log_level: LogLevel = LogLevel.INFO
+    log_format: LogFormat = LogFormat.JSON
+    trust_incoming_request_ids: bool = False
+    tracing_endpoint: AnyHttpUrl | None = None
 
     database_url: str = (
         "postgresql+asyncpg://ekumidayomi:development-only@localhost:5432/ekumidayomi"

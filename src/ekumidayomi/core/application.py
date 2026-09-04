@@ -10,7 +10,10 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from ekumidayomi import __version__
 from ekumidayomi.api.errors import register_error_handlers
 from ekumidayomi.api.health import router as health_router
+from ekumidayomi.api.middleware import RequestObservabilityMiddleware
 from ekumidayomi.api.v1.router import router as api_v1_router
+from ekumidayomi.core.logging import configure_logging
+from ekumidayomi.core.observability import NoOpMetrics, NoOpTracer
 from ekumidayomi.core.redis import (
     check_redis_connection,
     close_redis_client,
@@ -23,6 +26,14 @@ from ekumidayomi.db.session import Database
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Construct an application without opening infrastructure connections."""
     resolved_settings = settings or get_settings()
+    configure_logging(
+        service_name=resolved_settings.service_name,
+        environment=resolved_settings.app_env.value,
+        level=resolved_settings.log_level.value,
+        output_format=resolved_settings.log_format.value,
+    )
+    metrics = NoOpMetrics()
+    tracer = NoOpTracer()
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
@@ -56,6 +67,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         debug=resolved_settings.debug,
         lifespan=lifespan,
     )
+    application.state.metrics = metrics
+    application.state.tracer = tracer
     register_error_handlers(application)
     application.add_middleware(
         TrustedHostMiddleware,
@@ -69,6 +82,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
             allow_headers=["Accept", "Authorization", "Content-Type", "X-Request-ID"],
         )
+    application.add_middleware(
+        RequestObservabilityMiddleware,
+        metrics=metrics,
+        tracer=tracer,
+        trust_incoming_request_ids=resolved_settings.trust_incoming_request_ids,
+    )
 
     application.include_router(health_router)
     application.include_router(api_v1_router, prefix=resolved_settings.api_prefix)
