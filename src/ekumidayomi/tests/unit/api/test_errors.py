@@ -236,16 +236,23 @@ async def test_unexpected_error_is_generic_and_logs_only_safe_context(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     app = build_error_app()
-    caplog.set_level(logging.ERROR, logger="ekumidayomi.api.errors")
-
-    async with AsyncClient(
-        transport=ASGITransport(app=app, raise_app_exceptions=False),
-        base_url="http://test",
-    ) as client:
-        response = await client.get(
-            "/unexpected?password=query-secret",
-            headers={"X-Request-ID": "unexpected-789"},
-        )
+    error_logger = logging.getLogger("ekumidayomi.api.errors")
+    original_propagate = error_logger.propagate
+    caplog.set_level(logging.ERROR, logger=error_logger.name)
+    error_logger.propagate = False
+    error_logger.addHandler(caplog.handler)
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app, raise_app_exceptions=False),
+            base_url="http://test",
+        ) as client:
+            response = await client.get(
+                "/unexpected?password=query-secret",
+                headers={"X-Request-ID": "unexpected-789"},
+            )
+    finally:
+        error_logger.removeHandler(caplog.handler)
+        error_logger.propagate = original_propagate
 
     assert response.status_code == 500
     assert response.json() == {
@@ -261,8 +268,9 @@ async def test_unexpected_error_is_generic_and_logs_only_safe_context(
     assert "private-value" not in caplog.text
     record_context = caplog.records[0].__dict__
     assert record_context["request_id"] == "unexpected-789"
-    assert record_context["request_path"] == "/unexpected"
+    assert record_context["method"] == "GET"
     assert record_context["exception_type"] == "RuntimeError"
+    assert "request_path" not in record_context
 
 
 @pytest.mark.asyncio

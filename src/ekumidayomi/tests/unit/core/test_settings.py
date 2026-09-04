@@ -3,7 +3,13 @@
 import pytest
 from pydantic import ValidationError
 
-from ekumidayomi.core.settings import AppEnvironment, Settings, get_settings
+from ekumidayomi.core.settings import (
+    AppEnvironment,
+    LogFormat,
+    LogLevel,
+    Settings,
+    get_settings,
+)
 
 
 def test_development_defaults_use_the_development_database() -> None:
@@ -98,3 +104,29 @@ def test_get_settings_returns_one_cached_instance() -> None:
         assert first is second
     finally:
         get_settings.cache_clear()
+
+
+def test_observability_settings_have_safe_defaults() -> None:
+    settings = Settings(_env_file=None)
+
+    assert settings.service_name == "ekumidayomi-api"
+    assert settings.log_level is LogLevel.INFO
+    assert settings.log_format is LogFormat.JSON
+    assert settings.trust_incoming_request_ids is False
+    assert settings.tracing_endpoint is None
+
+
+def test_prefixed_observability_settings_are_parsed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("EKUMIDAYOMI_LOG_LEVEL", "ERROR")
+    monkeypatch.setenv("EKUMIDAYOMI_LOG_FORMAT", "console")
+    monkeypatch.setenv("EKUMIDAYOMI_TRUST_INCOMING_REQUEST_IDS", "true")
+    monkeypatch.setenv("EKUMIDAYOMI_TRACING_ENDPOINT", "https://telemetry.example.com")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.log_level is LogLevel.ERROR
+    assert settings.log_format is LogFormat.CONSOLE
+    assert settings.trust_incoming_request_ids is True
+    assert settings.tracing_endpoint is not None

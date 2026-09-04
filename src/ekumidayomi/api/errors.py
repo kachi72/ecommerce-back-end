@@ -116,8 +116,7 @@ async def handle_unexpected_error(request: Request, error: Exception) -> JSONRes
         "Unhandled application exception",
         extra={
             "request_id": request_id,
-            "request_method": request.method,
-            "request_path": request.url.path,
+            "method": request.method,
             "exception_type": type(error).__name__,
         },
     )
