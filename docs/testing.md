@@ -12,6 +12,24 @@ The test harness separates fast unit behavior from PostgreSQL-backed integration
 
 Integration tests use `EKUMIDAYOMI_TEST_DATABASE_URL`, never the development database URL. Each test receives a generated PostgreSQL schema, applies current SQLAlchemy metadata inside it, and drops the schema during teardown. A missing test database fails explicitly rather than skipping coverage.
 
+## Sprint 1 platform traceability
+
+| Contract | Unit evidence | Infrastructure evidence |
+|---|---|---|
+| Shared types | `tests/unit/core/test_types.py`, `tests/unit/platform/test_boundaries.py` | Not required |
+| Error envelope | `tests/unit/api/test_errors.py`, `tests/unit/api/test_platform_contracts.py` | Not required |
+| Unit of work | `tests/unit/db/test_uow.py` | `tests/integration/test_uow.py` |
+| ORM and migrations | `tests/unit/db/test_base.py`, `tests/unit/db/test_migrations.py` | `tests/integration/test_orm_conventions.py` |
+| Transactional outbox | `tests/unit/outbox/` | `tests/integration/test_outbox.py` |
+| Durable jobs | `tests/unit/jobs/` | `tests/integration/test_jobs.py`, `tests/integration/test_platform_concurrency.py` |
+| Redis cache | `tests/unit/cache/` | `tests/integration/test_cache.py` |
+| API conventions | `tests/unit/api/test_conventions.py` | Not required |
+| Audit trail | `tests/unit/audit/` | `tests/integration/test_audit.py` |
+| Observability | `tests/unit/api/test_observability.py` | Not required |
+| Media storage | `tests/unit/storage/test_storage.py` | Provider contract deferred |
+
+Unit tests must not open infrastructure connections. Integration tests use isolated PostgreSQL schemas and Redis key namespaces. Concurrency behavior is tested only against PostgreSQL and Redis, never SQLite or a mock lock implementation.
+
 ## Coverage map
 
 | Test layer | Current responsibility | Required infrastructure | Deferred responsibility |
@@ -22,6 +40,8 @@ Integration tests use `EKUMIDAYOMI_TEST_DATABASE_URL`, never the development dat
 | Redis-compatible fake | Deterministic decoded command behavior used by current services | None | Lua scripts, eviction behavior, failover, and real-Redis protocol details |
 | Provider contract | Adapter request/response contracts and provider failure mapping | Provider sandbox or recorded contract boundary | Payment, email, shipping, analytics, and object-storage providers |
 | Critical flow | Complete customer and administrator journeys across domains | Full isolated stack | Introduced with domain features and enforced before release |
+
+Cloud-provider compatibility remains unclaimed until a provider adapter passes a sandbox or recorded contract suite. The in-memory media adapter proves the application-facing storage contract only.
 
 ## Test policy
 
