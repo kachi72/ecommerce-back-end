@@ -1,6 +1,7 @@
 """Tests for reusable API query and response conventions."""
 
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
@@ -132,16 +133,60 @@ def test_domain_page_serialization_preserves_metadata() -> None:
     assert serialize_page(domain_page).pagination.has_next is True
 
 
-def test_money_response_uses_current_version_one_shape() -> None:
-    assert MoneyResponse.from_domain(Money(amount_kobo=150_000)).model_dump() == {
-        "amount_kobo": 150_000,
-        "currency": "NGN",
-    }
+def test_money_response_uses_a_four_place_decimal_string() -> None:
+    response = MoneyResponse.from_domain(Money.from_value(amount="1500", currency="ngn"))
 
+    assert response.model_dump() == {"amount": "1500.0000", "currency": "NGN"}
+    assert response.model_dump_json() == '{"amount":"1500.0000","currency":"NGN"}'
+
+
+@pytest.mark.parametrize(
+    "amount",
+    ["1500", "1500.0", "1500.001", "1500.00000", "01.0000", "1." + "\u0660" * 4, "10.0000\n"],
+)
+def test_money_response_rejects_noncanonical_amounts(amount: str) -> None:
     with pytest.raises(ValidationError):
-        MoneyResponse(amount_kobo=-1)
+        MoneyResponse(amount=amount)
+
+
+@pytest.mark.parametrize("currency", ["ngn", "NG", "NGNN", "N1N"])
+def test_money_response_rejects_noncanonical_currency_codes(currency: str) -> None:
     with pytest.raises(ValidationError):
-        MoneyResponse(amount_kobo=1, currency="USD")  # type: ignore[arg-type]
+        MoneyResponse(amount="1500.0000", currency=currency)
+
+
+@pytest.mark.parametrize("amount", [1500, 1500.0, Decimal("1500"), True])
+def test_money_response_rejects_non_string_amounts(amount: object) -> None:
+    with pytest.raises(ValidationError):
+        MoneyResponse.model_validate({"amount": amount, "currency": "NGN"})
+
+
+@pytest.mark.parametrize("amount", ["NaN", "Infinity", "-Infinity", "1000000000000000.0000"])
+def test_money_response_rejects_nonfinite_or_out_of_precision_amounts(amount: str) -> None:
+    with pytest.raises(ValidationError):
+        MoneyResponse(amount=amount)
+
+
+@pytest.mark.parametrize("amount", ["999999999999999.9999", "-999999999999999.9999"])
+def test_money_response_accepts_signed_precision_boundaries(amount: str) -> None:
+    value = Money.from_value(amount=amount, currency=" usd ")
+    assert MoneyResponse.from_domain(value).model_dump() == {"amount": amount, "currency": "USD"}
+
+
+async def test_money_is_a_string_in_the_http_response() -> None:
+    application = FastAPI()
+
+    @application.get("/money", response_model=MoneyResponse)
+    async def money() -> MoneyResponse:
+        return MoneyResponse.from_domain(Money.from_value(amount="1500.12345"))
+
+    async with AsyncClient(
+        transport=ASGITransport(app=application), base_url="http://test"
+    ) as client:
+        response = await client.get("/money")
+
+    assert response.status_code == 200
+    assert response.json() == {"amount": "1500.1234", "currency": "NGN"}
 
 
 class SerializationProbe(BaseModel):
@@ -170,7 +215,9 @@ def test_serialization_types_publish_safe_openapi_examples() -> None:
 
     assert schema["$defs"]["APIEntityId"]["examples"] == ["7b9c61d4-81d5-4bf4-8945-3354a481b109"]
     assert schema["$defs"]["UTCDateTime"]["examples"] == ["2026-08-31T12:30:00Z"]
-    assert money_schema["properties"]["amount_kobo"]["examples"] == [150_000]
+    assert money_schema["properties"]["amount"]["examples"] == ["1500.0000"]
+    assert money_schema["properties"]["amount"]["type"] == "string"
+    assert money_schema["properties"]["currency"]["examples"] == ["NGN"]
 
 
 def test_sorting_is_allowlisted_unique_and_stable() -> None:
