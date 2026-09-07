@@ -1,16 +1,26 @@
 """Tests for dependency-free shared value contracts."""
 
+from dataclasses import FrozenInstanceError
 from datetime import UTC, datetime, timedelta, timezone
+from decimal import Decimal
+from typing import cast
 from uuid import UUID
 
 import pytest
 
 from ekumidayomi.core.types import (
-    Currency,
+    CURRENCY_CODE_LENGTH,
+    DEFAULT_CURRENCY,
+    MONEY_PRECISION,
+    MONEY_QUANTUM,
+    MONEY_SCALE,
+    DecimalInput,
     Money,
     Page,
     PageRequest,
     new_entity_id,
+    normalize_currency,
+    quantize_money,
     require_utc,
     serialize_entity_id,
     serialize_utc,
@@ -18,78 +28,110 @@ from ekumidayomi.core.types import (
 )
 
 
-@pytest.mark.parametrize("amount", [True, False, 10.5, "100"])
-def test_money_rejects_non_integer_kobo(amount: object) -> None:
-    with pytest.raises(TypeError, match="must be an integer"):
-        Money(amount)  # type: ignore[arg-type]
+def test_shared_money_and_currency_conventions() -> None:
+    assert DEFAULT_CURRENCY == "NGN"
+    assert CURRENCY_CODE_LENGTH == 3
+    assert MONEY_PRECISION == 19
+    assert MONEY_SCALE == 4
+    assert MONEY_QUANTUM == Decimal("0.0001")
 
 
-def test_money_rejects_negative_kobo() -> None:
-    with pytest.raises(ValueError, match="non-negative"):
-        Money(-1)
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [("ngn", "NGN"), (" NGN ", "NGN"), ("usd", "USD")],
+)
+def test_normalize_currency_returns_uppercase_three_letter_code(
+    value: str,
+    expected: str,
+) -> None:
+    assert normalize_currency(value) == expected
 
 
-def test_money_rejects_unsupported_currency() -> None:
-    with pytest.raises(ValueError, match="unsupported currency"):
-        Money(100, "USD")  # type: ignore[arg-type]
+@pytest.mark.parametrize("value", ["", "NG", "NGNN", "N1N", "N-N", "N₦N"])
+def test_normalize_currency_rejects_invalid_codes(value: str) -> None:
+    with pytest.raises(ValueError, match="three-letter ASCII"):
+        normalize_currency(value)
 
 
-def test_money_serializes_with_explicit_ngn_currency() -> None:
-    money = Money(125_050)
-
-    assert money.currency is Currency.NGN
-    assert money.to_dict() == {
-        "amount_kobo": 125_050,
-        "currency": "NGN",
-    }
-
-
-def test_money_is_immutable() -> None:
-    money = Money(100)
-
-    with pytest.raises(AttributeError):
-        money.amount_kobo = 200  # type: ignore[misc]
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (Decimal(10), Decimal("10.0000")),
+        ("10.12567", Decimal("10.1257")),
+        ("-1.23456", Decimal("-1.2346")),
+    ],
+)
+def test_quantize_money_accepts_exact_inputs(
+    value: DecimalInput,
+    expected: Decimal,
+) -> None:
+    assert quantize_money(value) == expected
 
 
-def test_money_supports_same_currency_arithmetic_and_ordering() -> None:
-    smaller = Money(150)
-    larger = Money(250)
-
-    assert smaller + larger == Money(400)
-    assert larger - smaller == Money(100)
-    assert smaller < larger
-    assert larger > smaller
-
-
-def test_money_subtraction_cannot_create_a_negative_amount() -> None:
-    with pytest.raises(ValueError, match="non-negative"):
-        Money(100) - Money(101)
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("10.00005", Decimal("10.0000")),
+        ("10.00015", Decimal("10.0002")),
+        ("-10.00005", Decimal("-10.0000")),
+        ("-10.00015", Decimal("-10.0002")),
+    ],
+)
+def test_quantize_money_uses_round_half_even(value: str, expected: Decimal) -> None:
+    assert quantize_money(value) == expected
 
 
-def test_money_rejects_arithmetic_with_an_unrelated_value() -> None:
+@pytest.mark.parametrize("value", [True, 10, 10.25])
+def test_quantize_money_rejects_inexact_runtime_types(value: object) -> None:
     with pytest.raises(TypeError):
-        Money(100) + 100
+        quantize_money(cast("DecimalInput", value))
 
 
-def test_money_rejects_subtraction_with_an_unrelated_value() -> None:
-    with pytest.raises(TypeError):
-        Money(100) - 100
+@pytest.mark.parametrize("value", ["not-money", "", "--10"])
+def test_quantize_money_rejects_invalid_decimal_strings(value: str) -> None:
+    with pytest.raises(ValueError, match="valid decimal"):
+        quantize_money(value)
 
 
-def test_money_rejects_ordering_with_an_unrelated_value() -> None:
-    with pytest.raises(TypeError):
-        _ = Money(100) < 100
+def test_money_direct_construction_normalizes_amount_and_currency() -> None:
+    result = Money(amount=Decimal("10.55555"), currency=" ngn ")
+
+    assert result.amount == Decimal("10.5556")
+    assert result.currency == "NGN"
 
 
-def test_money_rejects_currency_mismatch() -> None:
-    ngn = Money(100)
-    other = Money(100)
-    object.__setattr__(other, "currency", "USD")
+def test_money_factory_defaults_to_ngn() -> None:
+    result = Money.from_value(amount="50")
 
-    with pytest.raises(ValueError, match="same currency"):
-        ngn + other
-    with pytest.raises(ValueError, match="same currency"):
-        _ = ngn < other
+    assert result == Money(amount=Decimal("50.0000"), currency="NGN")
+
+
+def test_money_is_immutable_after_construction() -> None:
+    money = Money.from_value(amount="10")
+
+    with pytest.raises(FrozenInstanceError):
+        setattr(money, "amount", Decimal(20))  # noqa: B010
+
+
+def test_money_addition_preserves_currency_and_scale() -> None:
+    result = Money.from_value(amount="10.1255") + Money.from_value(amount="2.1000")
+
+    assert result == Money(amount=Decimal("12.2255"), currency="NGN")
+
+
+def test_money_subtraction_preserves_signed_results_and_scale() -> None:
+    result = Money.from_value(amount="2.1000") - Money.from_value(amount="10.1255")
+
+    assert result == Money(amount=Decimal("-8.0255"), currency="NGN")
+
+
+@pytest.mark.parametrize("operator", ["add", "subtract"])
+def test_money_rejects_mixed_currency_arithmetic(operator: str) -> None:
+    naira = Money.from_value(amount="10", currency="NGN")
+    dollars = Money.from_value(amount="2", currency="USD")
+
+    with pytest.raises(ValueError, match="currency mismatch"):
+        _ = naira + dollars if operator == "add" else naira - dollars
 
 
 def test_new_entity_id_returns_unique_uuids() -> None:
@@ -172,12 +214,12 @@ def test_page_request_exposes_offset_and_json_safe_values() -> None:
 
 
 def test_page_serializes_items_and_metadata() -> None:
-    page = Page(items=(Money(100), Money(200)), total_items=5, page=2, page_size=2)
+    page = Page(items=(UUID(int=1), UUID(int=2)), total_items=5, page=2, page_size=2)
 
-    assert page.to_dict(Money.to_dict) == {
+    assert page.to_dict(str) == {
         "items": [
-            {"amount_kobo": 100, "currency": "NGN"},
-            {"amount_kobo": 200, "currency": "NGN"},
+            "00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-000000000002",
         ],
         "pagination": {
             "page": 2,

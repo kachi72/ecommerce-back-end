@@ -8,6 +8,7 @@ from ekumidayomi.db.base import (
     UUIDPrimaryKeyMixin,
 )
 from ekumidayomi.db.session import Database
+from ekumidayomi.db.types import money_type
 from ekumidayomi.db.uow import SqlAlchemyUnitOfWork, UnitOfWork
 
 __all__ = [
@@ -19,4 +20,5 @@ __all__ = [
     "TimestampMixin",
     "UUIDPrimaryKeyMixin",
     "UnitOfWork",
+    "money_type",
 ]

@@ -1,9 +1,9 @@
 """Dependency-free value contracts shared by application domains.
 
-Money is persisted as an integer number of minor units (kobo). PostgreSQL
-integer columns, rather than binary floating-point columns, own that persisted
-representation. Currency conversion and fractional-kobo rounding are outside
-the version-one contract.
+Money uses exact Decimal inputs and four-place round-half-even normalization.
+Persistence adapters use PostgreSQL NUMERIC(19, 4); API adapters use fixed-scale
+strings. Currency defaults to NGN, while signed amounts and other normalized
+three-letter currencies remain valid in this shared contract.
 """
 
 from __future__ import annotations
@@ -11,67 +11,78 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from enum import StrEnum
-from functools import total_ordering
-from types import NotImplementedType
-from typing import NewType, Self
+from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
+from typing import Final, NewType
 from uuid import UUID, uuid4
 
 EntityId = NewType("EntityId", UUID)
 
 
-class Currency(StrEnum):
-    """Currencies supported by the application."""
+type DecimalInput = Decimal | str
 
-    NGN = "NGN"
+DEFAULT_CURRENCY: Final = "NGN"
+CURRENCY_CODE_LENGTH: Final = 3
+MONEY_PRECISION: Final = 19
+MONEY_SCALE: Final = 4
+MONEY_QUANTUM: Final = Decimal("0.0001")
 
 
-@total_ordering
+def normalize_currency(value: str) -> str:
+    """Return a normalized three-letter ASCII currency code."""
+    currency = value.strip().upper()
+    if len(currency) != CURRENCY_CODE_LENGTH or not currency.isascii() or not currency.isalpha():
+        msg = "currency must be a three-letter ASCII code"
+        raise ValueError(msg)
+    return currency
+
+
+def quantize_money(value: DecimalInput) -> Decimal:
+    """Convert an exact input to the project's four-place monetary scale."""
+    if isinstance(value, bool):
+        msg = "boolean values are not valid monetary amounts"
+        raise TypeError(msg)
+    if isinstance(value, float):
+        msg = "floating-point values are not valid monetary amounts"
+        raise TypeError(msg)
+    if isinstance(value, int):
+        msg = "integer values are not valid monetary amounts"
+        raise TypeError(msg)
+    try:
+        decimal_value = value if isinstance(value, Decimal) else Decimal(value)
+    except (InvalidOperation, ValueError) as error:
+        msg = "money must be a valid decimal value"
+        raise ValueError(msg) from error
+    return decimal_value.quantize(MONEY_QUANTUM, rounding=ROUND_HALF_EVEN)
+
+
 @dataclass(frozen=True, slots=True)
 class Money:
-    """A non-negative amount represented in integer kobo."""
+    """An exact monetary amount paired with a normalized currency."""
 
-    amount_kobo: int
-    currency: Currency = Currency.NGN
+    amount: Decimal
+    currency: str = DEFAULT_CURRENCY
 
     def __post_init__(self) -> None:
-        if isinstance(self.amount_kobo, bool) or not isinstance(self.amount_kobo, int):
-            raise TypeError("amount_kobo must be an integer")
-        if self.amount_kobo < 0:
-            raise ValueError("amount_kobo must be non-negative")
+        object.__setattr__(self, "amount", quantize_money(self.amount))
+        object.__setattr__(self, "currency", normalize_currency(self.currency))
 
-        try:
-            currency = Currency(self.currency)
-        except (TypeError, ValueError) as error:
-            raise ValueError(f"unsupported currency: {self.currency!r}") from error
-        object.__setattr__(self, "currency", currency)
+    @classmethod
+    def from_value(cls, *, amount: DecimalInput, currency: str = DEFAULT_CURRENCY) -> Money:
+        """Build money without permitting binary floating-point input."""
+        return cls(amount=quantize_money(amount), currency=currency)
 
-    def __add__(self, other: object) -> Self | NotImplementedType:
-        if not isinstance(other, Money):
-            return NotImplemented
+    def __add__(self, other: Money) -> Money:
         self._require_same_currency(other)
-        return type(self)(self.amount_kobo + other.amount_kobo, self.currency)
+        return Money(amount=self.amount + other.amount, currency=self.currency)
 
-    def __sub__(self, other: object) -> Self | NotImplementedType:
-        if not isinstance(other, Money):
-            return NotImplemented
+    def __sub__(self, other: Money) -> Money:
         self._require_same_currency(other)
-        return type(self)(self.amount_kobo - other.amount_kobo, self.currency)
-
-    def __lt__(self, other: object) -> bool | NotImplementedType:
-        if not isinstance(other, Money):
-            return NotImplemented
-        self._require_same_currency(other)
-        return self.amount_kobo < other.amount_kobo
-
-    def to_dict(self) -> dict[str, int | str]:
-        """Return the stable JSON-safe money representation."""
-
-        return {"amount_kobo": self.amount_kobo, "currency": self.currency.value}
+        return Money(amount=self.amount - other.amount, currency=self.currency)
 
     def _require_same_currency(self, other: Money) -> None:
-        if self.currency is not other.currency:
-            raise ValueError("money values must use the same currency")
+        if self.currency != other.currency:
+            msg = f"currency mismatch: {self.currency} != {other.currency}"
+            raise ValueError(msg)
 
 
 @dataclass(frozen=True, slots=True)

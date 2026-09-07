@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Annotated, Literal, Self
+from typing import Annotated, Self
 from uuid import UUID
 
 from pydantic import (
@@ -16,7 +16,7 @@ from pydantic import (
     model_validator,
 )
 
-from ekumidayomi.core.types import Money, require_utc, serialize_utc
+from ekumidayomi.core.types import DEFAULT_CURRENCY, MONEY_SCALE, Money, require_utc, serialize_utc
 from ekumidayomi.core.types import Page as DomainPage
 
 type APIEntityId = Annotated[
@@ -94,17 +94,29 @@ class Page[T](APIModel):
         )
 
 
-class MoneyResponse(APIModel):
-    """Current version-one NGN money response contract."""
+_MONEY_RESPONSE_PATTERN = r"^-?(?:0|[1-9][0-9]{0,14})\.[0-9]{4}$"
+_CURRENCY_PATTERN = r"^[A-Z]{3}$"
 
-    amount_kobo: int = Field(ge=0, examples=[150_000])
-    currency: Literal["NGN"] = "NGN"
+
+class MoneyResponse(APIModel):
+    """Exact fixed-scale money returned by the HTTP API."""
+
+    amount: str = Field(pattern=_MONEY_RESPONSE_PATTERN, examples=["1500.0000"])
+    currency: str = Field(
+        default=DEFAULT_CURRENCY,
+        min_length=3,
+        max_length=3,
+        pattern=_CURRENCY_PATTERN,
+        examples=["NGN"],
+    )
 
     @classmethod
     def from_domain(cls, value: Money) -> Self:
         """Build the HTTP representation of a domain money value."""
-
-        return cls(amount_kobo=value.amount_kobo, currency=value.currency.value)
+        return cls(
+            amount=format(value.amount, f".{MONEY_SCALE}f"),
+            currency=value.currency,
+        )
 
 
 def serialize_page[T](page: DomainPage[T], *, items: Sequence[T] | None = None) -> Page[T]:
