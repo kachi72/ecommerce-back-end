@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from redis.asyncio import Redis
 
-from ekumidayomi.core.errors import DependencyUnavailableError
+from ekumidayomi.api.health_errors import ServiceNotReadyError
 from ekumidayomi.core.redis import check_redis_connection
 from ekumidayomi.db.session import Database
 
@@ -52,11 +52,7 @@ async def ready(request: Request) -> ReadinessResponse:
         checks["redis"] = "failed"
 
     if "failed" in checks.values():
-        raise DependencyUnavailableError(
-            code="service_not_ready",
-            message="Service is not ready",
-            details={"checks": checks},
-        )
+        raise ServiceNotReadyError(checks=checks)
 
     return ReadinessResponse(
         status="ok",

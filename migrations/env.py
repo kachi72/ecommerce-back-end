@@ -12,8 +12,9 @@ from ekumidayomi.core.settings import get_settings
 from ekumidayomi.db.base import Base
 from ekumidayomi.jobs.models import Job
 from ekumidayomi.outbox.model import OutboxMessage
+from ekumidayomi.users.model import User
 
-_REGISTERED_MODELS = (AuditRecord, Job, OutboxMessage)
+_REGISTERED_MODELS = (AuditRecord, Job, OutboxMessage, User)
 
 config = context.config
 

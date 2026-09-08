@@ -1,0 +1,1 @@
+"""PostgreSQL-backed identity contracts."""
