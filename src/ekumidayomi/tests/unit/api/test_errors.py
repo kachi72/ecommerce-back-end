@@ -1,6 +1,7 @@
 """Tests for stable, privacy-safe API error responses."""
 
 import logging
+from http import HTTPStatus
 from uuid import UUID
 
 import pytest
@@ -32,6 +33,14 @@ class RequestBody(BaseModel):
     name: str
 
 
+class LockedResourceError(ConflictError):
+    """Prove that a subclass status overrides its generic parent's status."""
+
+    status_code = HTTPStatus.LOCKED
+    code = "resource_locked"
+    message = "The resource is locked."
+
+
 ERROR_CASES = [
     (NotFoundError, 404),
     (ConflictError, 409),
@@ -41,6 +50,7 @@ ERROR_CASES = [
     (RateLimitError, 429),
     (DependencyUnavailableError, 503),
     (ApplicationError, 400),
+    (LockedResourceError, 423),
 ]
 
 
@@ -51,11 +61,7 @@ def build_error_app() -> FastAPI:
     @application.get("/application-error/{case_index}")
     async def application_error(case_index: int) -> None:
         error_type, _ = ERROR_CASES[case_index]
-        raise error_type(
-            code="stable_failure",
-            message="A safe failure occurred",
-            details={"field": "quantity"},
-        )
+        raise error_type(details={"field": "quantity"})
 
     @application.post("/validation")
     async def validation(body: RequestBody) -> RequestBody:
@@ -68,18 +74,18 @@ def build_error_app() -> FastAPI:
     @application.get("/state-request-id")
     async def state_request_id(request: Request) -> None:
         request.state.request_id = "state-request-123"
-        raise NotFoundError(code="missing", message="Resource was not found")
+        raise NotFoundError()
 
     return application
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(("case_index", "case"), enumerate(ERROR_CASES))
-async def test_application_error_status_mapping_and_envelope(
+async def test_application_error_declared_status_and_envelope(
     case_index: int,
     case: tuple[type[ApplicationError], int],
 ) -> None:
-    _, expected_status = case
+    error_type, expected_status = case
     app = build_error_app()
 
     async with AsyncClient(
@@ -93,10 +99,11 @@ async def test_application_error_status_mapping_and_envelope(
 
     assert response.status_code == expected_status
     assert response.headers["x-request-id"] == "request-123"
+    assert response.headers["cache-control"] == "no-store"
     assert response.json() == {
         "error": {
-            "code": "stable_failure",
-            "message": "A safe failure occurred",
+            "code": error_type.code,
+            "message": error_type.message,
             "details": {"field": "quantity"},
             "request_id": "request-123",
         }

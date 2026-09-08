@@ -14,28 +14,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ekumidayomi.core.errors import (
     ApplicationError,
-    AuthenticationError,
-    ConflictError,
-    DependencyUnavailableError,
-    ForbiddenError,
     JsonValue,
-    NotFoundError,
-    RateLimitError,
-    ValidationError,
 )
 
 logger = logging.getLogger(__name__)
-
-ERROR_STATUS_BY_TYPE: dict[type[ApplicationError], int] = {
-    NotFoundError: status.HTTP_404_NOT_FOUND,
-    ConflictError: status.HTTP_409_CONFLICT,
-    ForbiddenError: status.HTTP_403_FORBIDDEN,
-    AuthenticationError: status.HTTP_401_UNAUTHORIZED,
-    ValidationError: status.HTTP_422_UNPROCESSABLE_CONTENT,
-    RateLimitError: status.HTTP_429_TOO_MANY_REQUESTS,
-    DependencyUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
-    ApplicationError: status.HTTP_400_BAD_REQUEST,
-}
 
 _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 _FIELD_SEGMENT_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
@@ -69,25 +51,20 @@ def register_error_handlers(application: FastAPI) -> None:
 
 
 async def handle_application_error(request: Request, error: Exception) -> JSONResponse:
-    """Translate an HTTP-neutral application error at the API boundary."""
+    """Render the error subclass's contract without a separate type/status registry."""
 
     if not isinstance(error, ApplicationError):
         raise TypeError("application error handler received an unsupported exception")
-    status_code = next(
-        (
-            mapped_status
-            for error_type, mapped_status in ERROR_STATUS_BY_TYPE.items()
-            if isinstance(error, error_type)
-        ),
-        status.HTTP_400_BAD_REQUEST,
-    )
-    return _error_response(
+    response = _error_response(
         request=request,
-        status_code=status_code,
+        status_code=error.status_code,
         code=error.code,
         message=error.message,
         details=error.details,
     )
+    response.headers.update(error.headers)
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 async def handle_request_validation_error(request: Request, error: Exception) -> JSONResponse:
