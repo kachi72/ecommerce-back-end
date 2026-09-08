@@ -67,6 +67,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         debug=resolved_settings.debug,
         lifespan=lifespan,
     )
+    application.state.settings = resolved_settings
     application.state.metrics = metrics
     application.state.tracer = tracer
     register_error_handlers(application)
