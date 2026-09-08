@@ -6,6 +6,8 @@ from functools import lru_cache
 from pydantic import AnyHttpUrl, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from ekumidayomi.auth.settings import AuthSettings
+
 
 class AppEnvironment(StrEnum):
     DEVELOPMENT = "development"
@@ -27,12 +29,13 @@ class LogFormat(StrEnum):
 
 
 class Settings(BaseSettings):
-    """Configure loaded exclusively from environment variables."""
+    """Load and validate root and grouped configuration through one settings boundary."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         env_prefix="EKUMIDAYOMI_",
+        env_nested_delimiter="__",
         extra="ignore",
         case_sensitive=False,
     )
@@ -71,6 +74,7 @@ class Settings(BaseSettings):
     secure_cookies: bool = False
     secret_key: SecretStr = SecretStr("development-only-change-me")
     check_dependencies_on_startup: bool = True
+    auth: AuthSettings = Field(default_factory=AuthSettings)
 
     @property
     def active_database_url(self) -> str:

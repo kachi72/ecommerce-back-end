@@ -2,6 +2,45 @@
 
 All backend configuration is loaded by `ekumidayomi.core.settings.Settings`. Environment variables use the `EKUMIDAYOMI_` prefix. Application modules must consume the validated settings object and must not call `os.getenv()` directly.
 
+## Grouped settings
+
+`Settings` is the only environment/dotenv loader. It contains a validated `auth`
+group, accessed as `settings.auth.session_seconds`. `AuthSettings` is a Pydantic
+`BaseModel`, not a subclass of the global settings or a second `BaseSettings`
+loader. Creating `AuthSettings()` directly uses its defaults, not environment
+variables. Pass explicit values when constructing it in unit tests.
+
+Nested environment names use a double underscore:
+
+```text
+EKUMIDAYOMI_AUTH__SESSION_SECONDS=604800
+EKUMIDAYOMI_AUTH__ALLOWED_ORIGINS=["https://shop.example.com"]
+EKUMIDAYOMI_AUTH__ACTIVE_CHALLENGE_KEY=v1
+```
+
+Use `EKUMIDAYOMI_AUTH__CHALLENGE_KEYS` for the JSON map of version names to secret
+keys, injected through the secret boundary. Configure real keys before enabling
+challenge workflows; this configuration change does not enable auth endpoints.
+The earlier Sprint 2 draft's single-underscore `EKUMIDAYOMI_AUTH_*` names are
+superseded by `EKUMIDAYOMI_AUTH__*`. Do not use the old names.
+
+Nested values override the corresponding fields in a whole-group JSON value
+such as `EKUMIDAYOMI_AUTH`. Explicit constructor values take precedence over the
+environment. `Settings(_env_file=None)` disables dotenv loading for the entire
+object, including auth; environment variables still apply.
+
+`create_app(settings)` retains that exact validated object on `app.state.settings`.
+HTTP code uses `core.dependencies.get_request_settings`, or its `get_auth_settings`
+projection. Neither dependency reloads the environment. Tests can override the
+root dependency once and auth sees the same override. CLI/worker composition uses
+`get_settings()` once and passes `settings.auth` to auth services. Only the root
+`get_settings()` has a cache; clear that cache when deliberately reloading test
+configuration.
+
+Future provider groups must follow the same composition pattern rather than add
+independent environment loaders. Group validation runs when the root is built,
+before application startup opens infrastructure connections.
+
 ## Local setup
 
 From the repository root, create the untracked `.env` file.
