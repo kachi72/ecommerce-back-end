@@ -8,7 +8,11 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from ekumidayomi.audit.events import AuditEvent
 
 import sqlalchemy as sa
 from sqlalchemy.sql.elements import ColumnElement
@@ -362,3 +366,20 @@ def _validate_name(name: str, value: object, *, maximum: int) -> None:
 def _validate_correlation_id(value: object) -> None:
     if not isinstance(value, str) or _CORRELATION_ID_PATTERN.fullmatch(value) is None:
         raise ValueError("correlation_id must use 1-128 safe characters")
+
+
+def record_event(uow: UnitOfWork, event: AuditEvent) -> AuditRecord:
+    """Stage named evidence through the existing validated, sanitized recorder."""
+    data = event.to_record()
+    return record(
+        uow,
+        actor=data.actor,
+        action=data.action,
+        target_type=data.target_type,
+        target_id=data.target_id,
+        outcome=data.outcome,
+        metadata=data.metadata,
+        allowed_metadata_keys=data.allowed_metadata_keys,
+        correlation_id=data.correlation_id,
+        occurred_at=data.occurred_at,
+    )

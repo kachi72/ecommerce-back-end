@@ -6,10 +6,11 @@ from alembic.config import Config
 from alembic.script import ScriptDirectory
 
 from ekumidayomi.audit.model import AuditRecord
+from ekumidayomi.auth.challenge_model import EmailChallenge, PasswordCredential
 from ekumidayomi.auth.model import AuthSession
 from ekumidayomi.db.base import Base
 from ekumidayomi.jobs.models import Job
-from ekumidayomi.outbox.model import OutboxMessage
+from ekumidayomi.outbox.model import OutboxMessage, WorkerControl
 from ekumidayomi.users.model import User
 
 PROJECT_ROOT = Path(__file__).resolve().parents[5]
@@ -59,10 +60,16 @@ def test_platform_models_are_registered_for_autogeneration() -> None:
     assert AuditRecord.__tablename__ == "audit_records"
     assert User.__tablename__ == "users"
     assert AuthSession.__tablename__ == "auth_sessions"
+    assert EmailChallenge.__tablename__ == "email_challenges"
+    assert PasswordCredential.__tablename__ == "password_credentials"
+    assert WorkerControl.__tablename__ == "outbox_worker_controls"
     assert set(Base.metadata.tables) == {
         "audit_records",
         "auth_sessions",
+        "email_challenges",
         "jobs",
         "outbox_messages",
+        "outbox_worker_controls",
+        "password_credentials",
         "users",
     }

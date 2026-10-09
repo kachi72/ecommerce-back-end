@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ekumidayomi.users.errors import InvalidEmailError
 from ekumidayomi.users.model import Role, User
-from ekumidayomi.users.repository import by_email, by_id, create_customer
+from ekumidayomi.users.repository import create_customer, find_user_by_email, find_user_by_id
 
 
 async def test_create_customer_flushes_but_does_not_own_the_transaction() -> None:
@@ -31,7 +31,7 @@ async def test_invalid_email_is_rejected_before_persistence() -> None:
     with pytest.raises(InvalidEmailError):
         await create_customer(cast(AsyncSession, session), email="invalid")
     with pytest.raises(InvalidEmailError):
-        await by_email(cast(AsyncSession, session), "invalid")
+        await find_user_by_email(cast(AsyncSession, session), "invalid")
     session.add.assert_not_called()
     session.flush.assert_not_awaited()
     session.scalar.assert_not_awaited()
@@ -41,7 +41,7 @@ async def test_email_lookup_uses_the_same_normalization_policy() -> None:
     session = AsyncMock(spec=AsyncSession)
     user = User(email="customer@example.com")
     session.scalar.return_value = user
-    assert await by_email(cast(AsyncSession, session), " Customer@EXAMPLE.com ") is user
+    assert await find_user_by_email(cast(AsyncSession, session), " Customer@EXAMPLE.com ") is user
     statement = session.scalar.call_args.args[0]
     compiled = statement.compile(dialect=sa.engine.make_url("postgresql://").get_dialect()())
     assert list(compiled.params.values()) == ["customer@example.com"]
@@ -54,7 +54,7 @@ async def test_id_lookup_refreshes_existing_state_and_only_locks_when_requested(
     user_id = uuid4()
     user = User(id=user_id, email="customer@example.com")
     session.scalar.return_value = user
-    assert await by_id(cast(AsyncSession, session), user_id, lock=lock) is user
+    assert await find_user_by_id(cast(AsyncSession, session), user_id, lock=lock) is user
     statement = session.scalar.call_args.args[0]
     compiled = statement.compile(dialect=sa.engine.make_url("postgresql://").get_dialect()())
     assert list(compiled.params.values()) == [user_id]
@@ -67,5 +67,5 @@ async def test_id_lookup_refreshes_existing_state_and_only_locks_when_requested(
 async def test_missing_users_return_none() -> None:
     session = AsyncMock(spec=AsyncSession)
     session.scalar.return_value = None
-    assert await by_id(cast(AsyncSession, session), uuid4()) is None
-    assert await by_email(cast(AsyncSession, session), "missing@example.com") is None
+    assert await find_user_by_id(cast(AsyncSession, session), uuid4()) is None
+    assert await find_user_by_email(cast(AsyncSession, session), "missing@example.com") is None

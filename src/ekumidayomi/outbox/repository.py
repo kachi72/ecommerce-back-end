@@ -62,10 +62,21 @@ class OutboxRepository:
         *,
         limit: int = 50,
         now: datetime | None = None,
+        event_types: tuple[str, ...] | None = None,
     ) -> tuple[OutboxMessage, ...]:
         """Lock and claim one bounded, aggregate-ordered delivery batch."""
 
         _validate_limit(limit)
+        if event_types is not None:
+            if not isinstance(event_types, tuple) or not event_types:
+                raise ValueError("event_types must be a non-empty tuple or None")
+            if any(
+                not isinstance(value, str)
+                or len(value) > 100
+                or re.fullmatch(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*", value) is None
+                for value in event_types
+            ):
+                raise ValueError("event_types must contain safe event names")
         claimed_at = require_utc(now or utc_now())
         earlier = aliased(OutboxMessage)
         earlier_unpublished = exists(
@@ -81,6 +92,8 @@ class OutboxRepository:
             .where(
                 OutboxMessage.status.in_((OutboxStatus.PENDING.value, OutboxStatus.FAILED.value)),
                 OutboxMessage.attempts < self._max_attempts,
+                OutboxMessage.claim_token.is_(None),
+                OutboxMessage.event_type != "email_challenge_requested",
                 OutboxMessage.available_at <= claimed_at,
                 ~earlier_unpublished,
             )
@@ -92,6 +105,8 @@ class OutboxRepository:
             .limit(limit)
             .with_for_update(skip_locked=True)
         )
+        if event_types is not None:
+            statement = statement.where(OutboxMessage.event_type.in_(event_types))
         messages = tuple((await self._session.scalars(statement)).all())
         for message in messages:
             message.status = OutboxStatus.PROCESSING.value
@@ -112,6 +127,8 @@ class OutboxRepository:
 
         message = await self._session.get(OutboxMessage, message_id, with_for_update=True)
         if message is None or message.status == OutboxStatus.PUBLISHED.value:
+            return False
+        if message.claim_token is not None:
             return False
         if message.status != OutboxStatus.PROCESSING.value:
             return False
@@ -161,6 +178,7 @@ class OutboxRepository:
             .where(
                 OutboxMessage.status == OutboxStatus.PROCESSING.value,
                 OutboxMessage.claimed_at <= resolved_stale_before,
+                OutboxMessage.claim_token.is_(None),
             )
             .order_by(OutboxMessage.claimed_at, OutboxMessage.id)
             .limit(limit)

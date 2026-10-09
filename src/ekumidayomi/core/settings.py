@@ -7,6 +7,8 @@ from pydantic import AnyHttpUrl, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ekumidayomi.auth.settings import AuthSettings
+from ekumidayomi.email.settings import ResendSettings
+from ekumidayomi.outbox.settings import OutboxWorkerSettings
 
 
 class AppEnvironment(StrEnum):
@@ -75,6 +77,8 @@ class Settings(BaseSettings):
     secret_key: SecretStr = SecretStr("development-only-change-me")
     check_dependencies_on_startup: bool = True
     auth: AuthSettings = Field(default_factory=AuthSettings)
+    resend: ResendSettings | None = None
+    outbox_worker: OutboxWorkerSettings = Field(default_factory=OutboxWorkerSettings)
 
     @property
     def active_database_url(self) -> str:

@@ -8,14 +8,24 @@ from sqlalchemy import Connection, pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from ekumidayomi.audit.model import AuditRecord
+from ekumidayomi.auth.challenge_model import EmailChallenge, PasswordCredential
 from ekumidayomi.auth.model import AuthSession
 from ekumidayomi.core.settings import get_settings
 from ekumidayomi.db.base import Base
 from ekumidayomi.jobs.models import Job
-from ekumidayomi.outbox.model import OutboxMessage
+from ekumidayomi.outbox.model import OutboxMessage, WorkerControl
 from ekumidayomi.users.model import User
 
-_REGISTERED_MODELS = (AuditRecord, Job, OutboxMessage, User, AuthSession)
+_REGISTERED_MODELS = (
+    AuditRecord,
+    Job,
+    OutboxMessage,
+    WorkerControl,
+    User,
+    AuthSession,
+    EmailChallenge,
+    PasswordCredential,
+)
 
 config = context.config
 
