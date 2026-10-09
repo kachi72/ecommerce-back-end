@@ -207,7 +207,7 @@ selecting a distant Azure region.
 11. Use expand/migrate/contract sequencing for non-backward-compatible database changes. A
     migration downgrade is never the default rollback for data already written by a new version.
 
-The S10 deployment pipeline must define the private migration-runner mechanism and ensure two
+The S11 deployment pipeline must define the private migration-runner mechanism and ensure two
 workflow retries cannot execute a non-idempotent migration concurrently.
 
 ## Observability and incident entry points
@@ -319,7 +319,7 @@ provisioning remains blocked.
 ## Follow-up work after acceptance
 
 - Define infrastructure as code for the approved staging and production topology.
-- Implement the S10 immutable-image deployment and exactly-once migration pipeline.
+- Implement the S11 immutable-image deployment and exactly-once migration pipeline.
 - Add structured application logging, correlation, metrics, dashboards, and alert routing.
 - Add automated dependency and container vulnerability scanning.
 - Implement restore, Redis rebuild, migration failure, and application rollback runbooks.

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from ekumidayomi.tests.integration.conftest import set_search_path
 from ekumidayomi.users.errors import InvalidEmailError
 from ekumidayomi.users.model import Role, User
-from ekumidayomi.users.repository import by_email, by_id, create_customer
+from ekumidayomi.users.repository import create_customer, find_user_by_email, find_user_by_id
 
 
 async def test_customer_defaults_and_unicode_profile_round_trip(
@@ -31,7 +31,7 @@ async def test_customer_defaults_and_unicode_profile_round_trip(
     user_id = user.id
     await database_session.commit()
     database_session.expunge_all()
-    restored = await by_id(database_session, user_id)
+    restored = await find_user_by_id(database_session, user_id)
     assert restored is not None
     assert restored.display_name == "Ẹkúmidáyọ̀mí"
     assert restored.phone == "+2348012345678"
@@ -48,18 +48,18 @@ async def test_normalized_email_is_unique(database_session: AsyncSession) -> Non
 
 async def test_email_lookup_is_case_insensitive(database_session: AsyncSession) -> None:
     user = await create_customer(database_session, email="customer@example.com")
-    found = await by_email(database_session, " CUSTOMER@EXAMPLE.com ")
+    found = await find_user_by_email(database_session, " CUSTOMER@EXAMPLE.com ")
     assert found is not None
     assert found.id == user.id
-    assert await by_email(database_session, "missing@example.com") is None
-    assert await by_id(database_session, uuid4()) is None
+    assert await find_user_by_email(database_session, "missing@example.com") is None
+    assert await find_user_by_id(database_session, uuid4()) is None
 
 
 async def test_repository_leaves_rollback_to_caller(database_session: AsyncSession) -> None:
     user = await create_customer(database_session, email="rollback@example.com")
     user_id = user.id
     await database_session.rollback()
-    assert await by_id(database_session, user_id) is None
+    assert await find_user_by_id(database_session, user_id) is None
 
 
 async def test_invalid_email_does_not_add_a_user(database_session: AsyncSession) -> None:

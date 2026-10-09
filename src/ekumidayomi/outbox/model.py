@@ -19,6 +19,10 @@ class OutboxStatus(StrEnum):
     PROCESSING = "processing"
     PUBLISHED = "published"
     FAILED = "failed"
+    DEAD = "dead"
+    SKIPPED = "skipped"
+    UNCERTAIN = "uncertain"
+    BLOCKED = "blocked"
 
 
 class OutboxMessage(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -30,7 +34,17 @@ class OutboxMessage(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         sa.UniqueConstraint("idempotency_key"),
         sa.CheckConstraint("aggregate_version > 0", name="aggregate_version_positive"),
         sa.CheckConstraint("attempts >= 0", name="attempts_non_negative"),
+        sa.CheckConstraint("retry_budget > 0", name="retry_budget_positive"),
+        sa.CheckConstraint(
+            "jsonb_typeof(delivery_receipts) = 'object'", name="delivery_receipts_object"
+        ),
+        sa.CheckConstraint(
+            "(claim_token IS NULL AND lease_expires_at IS NULL) OR "
+            "(claim_token IS NOT NULL AND lease_expires_at IS NOT NULL)",
+            name="lease_pair_valid",
+        ),
         sa.Index(None, "status", "available_at"),
+        sa.Index(None, "status", "lease_expires_at"),
         sa.Index(None, "aggregate_type", "aggregate_id", "aggregate_version"),
     )
 
@@ -60,6 +74,16 @@ class OutboxMessage(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     claimed_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
     last_error_code: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
+    claim_token: Mapped[UUID | None] = mapped_column(sa.UUID(as_uuid=True))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    delivery_fingerprint: Mapped[str | None] = mapped_column(sa.String(64))
+    delivery_receipts: Mapped[dict[str, str]] = mapped_column(
+        postgresql.JSONB, nullable=False, default=dict, server_default=sa.text("'{}'::jsonb")
+    )
+    retry_budget: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False, default=5, server_default=sa.text("5")
+    )
+    deadline_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
 
     def to_event(self) -> DomainEvent:
         """Recreate the provider-neutral event envelope."""
@@ -73,3 +97,12 @@ class OutboxMessage(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             occurred_at=self.occurred_at,
             payload=self.payload,
         )
+
+
+class WorkerControl(Base):
+    """Durable pause and heartbeat; not a source of business facts."""
+
+    __tablename__ = "outbox_worker_controls"
+    worker_group: Mapped[str] = mapped_column(sa.String(100), primary_key=True)
+    paused: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False)
+    heartbeat_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)

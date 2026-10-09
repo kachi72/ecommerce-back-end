@@ -17,13 +17,14 @@ dependencies = [
   "sqlalchemy[asyncio]>=2.0.41,<3",
   "email-validator>=2.2,<3",
   "uvicorn[standard]>=0.35,<1",
+  "argon2-cffi>=25.1,<26",
+  "httpx>=0.28,<1",
 ]
 
 [dependency-groups]
 dev = [
   "fakeredis>=2.30,<3",
   "furo>=2025.7.19",
-  "httpx>=0.28,<1",
   "mypy>=1.17,<2",
   "myst-parser>=4,<5",
   "pytest>=8.4,<9",

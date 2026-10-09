@@ -17,12 +17,14 @@ def normalize_email(value: str) -> str:
         raise InvalidEmailError() from None
 
 
-async def by_email(session: AsyncSession, email: str) -> User | None:
+async def find_user_by_email(session: AsyncSession, email: str) -> User | None:
     user = await session.scalar(sa.select(User).where(User.email == normalize_email(email)))
     return user
 
 
-async def by_id(session: AsyncSession, user_id: UUID, *, lock: bool = False) -> User | None:
+async def find_user_by_id(
+    session: AsyncSession, user_id: UUID, *, lock: bool = False
+) -> User | None:
     statement = sa.select(User).where(User.id == user_id)
     if lock:
         statement = statement.with_for_update()
