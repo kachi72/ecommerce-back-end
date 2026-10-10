@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Request, Response, status
 
 from ekumidayomi.api.v1.registration import Config
 from ekumidayomi.auth import schemas as auth_schemas
-from ekumidayomi.auth.challenge_model import PasswordCredential
+from ekumidayomi.auth import service as auth_service
 from ekumidayomi.auth.dependencies import (
     app_settings,
     clear_session_cookie,
@@ -17,11 +17,7 @@ from ekumidayomi.auth.dependencies import (
     session_service,
     set_session_cookie,
 )
-from ekumidayomi.auth.model import AuthSession
-from ekumidayomi.auth.passwords import verify_password
-from ekumidayomi.auth.service import begin_reset, complete_reset, login
 from ekumidayomi.auth.sessions import Actor, SessionService
-from ekumidayomi.core.types import utc_now
 from ekumidayomi.db.dependencies import get_unit_of_work
 from ekumidayomi.db.uow import UnitOfWork
 from ekumidayomi.users.errors import AuthenticationRequiredError
@@ -39,16 +35,14 @@ CurrentActor = Annotated[Actor, Depends(current_actor)]
 async def sign_in(
     body: auth_schemas.LoginInput, request: Request, uow: Uow, sessions: Sessions
 ) -> Response:
-    secret = await login(uow, sessions, email=body.email, password=body.password.get_secret_value())
     previous = request.cookies.get(cookie_name(app_settings(request)))
-    if previous:
-        try:
-            old_actor = await sessions.resolve(uow, previous)
-        except AuthenticationRequiredError:
-            old_actor = None
-        if old_actor is not None:
-            await sessions.revoke(uow, user_id=old_actor.user_id, session_id=old_actor.session_id)
-    await uow.commit()
+    secret = await auth_service.login(
+        uow,
+        sessions,
+        email=body.email,
+        password=body.password.get_secret_value(),
+        previous_secret=previous,
+    )
     response = Response(status_code=204)
     set_session_cookie(response, secret, app_settings(request), sessions.settings.session_seconds)
     return response
@@ -72,13 +66,11 @@ async def me(actor: CurrentActor, uow: Uow, response: Response) -> dict[str, str
     "/logout", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_origin)]
 )
 async def logout(request: Request, uow: Uow, sessions: Sessions) -> Response:
-    try:
-        actor = await sessions.resolve(uow, request.cookies.get(cookie_name(app_settings(request))))
-    except AuthenticationRequiredError:
-        actor = None
-    if actor is not None:
-        await sessions.revoke(uow, user_id=actor.user_id, session_id=actor.session_id)
-        await uow.commit()
+    await auth_service.logout(
+        uow,
+        sessions,
+        request.cookies.get(cookie_name(app_settings(request))),
+    )
     response = Response(status_code=204)
     clear_session_cookie(response, app_settings(request))
     return response
@@ -88,9 +80,7 @@ async def logout(request: Request, uow: Uow, sessions: Sessions) -> Response:
 async def logout_all(
     actor: CurrentActor, request: Request, uow: Uow, sessions: Sessions
 ) -> Response:
-    await find_user_by_id(uow.session, actor.user_id, lock=True)
-    await sessions.revoke(uow, user_id=actor.user_id)
-    await uow.commit()
+    await auth_service.logout_all(uow, sessions, actor)
     response = Response(status_code=204)
     clear_session_cookie(response, app_settings(request))
     return response
@@ -100,23 +90,7 @@ async def logout_all(
 async def reauthenticate(
     body: auth_schemas.PasswordInput, actor: CurrentActor, uow: Uow
 ) -> Response:
-    user = await find_user_by_id(uow.session, actor.user_id, lock=True)
-    credential = await uow.session.get(PasswordCredential, actor.user_id)
-    valid = await verify_password(
-        credential.password_hash if credential else None, body.password.get_secret_value()
-    )
-    row = await uow.session.get(AuthSession, actor.session_id, populate_existing=True)
-    if (
-        not valid
-        or user is None
-        or not user.is_active
-        or row is None
-        or row.revoked_at is not None
-        or row.expires_at <= utc_now()
-    ):
-        raise AuthenticationRequiredError()
-    row.authenticated_at = utc_now()
-    await uow.commit()
+    await auth_service.reauthenticate(uow, actor, password=body.password.get_secret_value())
     return Response(status_code=204, headers={"Cache-Control": "no-store"})
 
 
@@ -128,8 +102,7 @@ async def reauthenticate(
 async def request_reset(
     body: auth_schemas.EmailInput, uow: Uow, config: Config, response: Response
 ) -> auth_schemas.ChallengeAccepted:
-    identifier = await begin_reset(uow, body.email, config)
-    await uow.commit()
+    identifier = await auth_service.begin_reset(uow, body.email, config)
     response.headers["Cache-Control"] = "no-store"
     return auth_schemas.ChallengeAccepted(challenge_id=identifier)
 
@@ -146,7 +119,7 @@ async def confirm_reset(
     config: Config,
     sessions: Annotated[SessionService, Depends(session_service)],
 ) -> Response:
-    await complete_reset(
+    await auth_service.complete_reset(
         uow,
         sessions,
         challenge_id=body.challenge_id,
@@ -155,7 +128,6 @@ async def confirm_reset(
         settings=config,
         correlation_id=getattr(request.state, "request_id", str(uuid4())),
     )
-    await uow.commit()
     response = Response(status_code=204)
     clear_session_cookie(response, app_settings(request))
     return response

@@ -32,7 +32,6 @@ async def test_reset_revokes_all_sessions(
     second = await sessions.issue(identity_uow, user)
     await identity_uow.commit()
     identifier = await begin_reset(identity_uow, user.email, config)
-    await identity_uow.commit()
     challenge = await identity_uow.session.get(EmailChallenge, identifier)
     assert challenge is not None
     code = derive_code(challenge, config)
@@ -45,7 +44,6 @@ async def test_reset_revokes_all_sessions(
         settings=config,
         correlation_id="test-reset",
     )
-    await identity_uow.commit()
     assert await verify_password(credential.password_hash, "the replacement long password")
     for secret in (first, second):
         with pytest.raises(AuthenticationRequiredError):

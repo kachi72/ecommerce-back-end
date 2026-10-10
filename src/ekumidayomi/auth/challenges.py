@@ -137,7 +137,6 @@ async def consume_challenge(
                 purpose=purpose,
             ),
         )
-        await uow.commit()
         raise InvalidChallengeError()
     row.attempts += 1
     if not hmac.compare_digest(row.code_hash, code_digest(row, code, settings)):
@@ -150,7 +149,6 @@ async def consume_challenge(
                 purpose=purpose,
             ),
         )
-        await uow.commit()
         raise InvalidChallengeError()
     row.consumed_at = utc_now()
     return row

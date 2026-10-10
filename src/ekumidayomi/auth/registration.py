@@ -30,14 +30,17 @@ async def begin_registration(
     await lock_email(uow, email)
     user = await find_user_by_email(uow.session, email)
     if user is not None:
-        return uuid4()
-    return await issue_challenge(
-        uow,
-        email=email,
-        purpose=ChallengePurpose.REGISTRATION,
-        settings=settings,
-        correlation_id=correlation_id,
-    )
+        challenge_id = uuid4()
+    else:
+        challenge_id = await issue_challenge(
+            uow,
+            email=email,
+            purpose=ChallengePurpose.REGISTRATION,
+            settings=settings,
+            correlation_id=correlation_id,
+        )
+    await uow.commit()
+    return challenge_id
 
 
 async def complete_registration(
@@ -51,13 +54,17 @@ async def complete_registration(
 ) -> None:
     correlation_id = correlation_id or str(uuid4())
     await validate_new_password(password)
-    challenge = await consume_challenge(
-        uow,
-        challenge_id=challenge_id,
-        code=code,
-        purpose=ChallengePurpose.REGISTRATION,
-        settings=settings,
-    )
+    try:
+        challenge = await consume_challenge(
+            uow,
+            challenge_id=challenge_id,
+            code=code,
+            purpose=ChallengePurpose.REGISTRATION,
+            settings=settings,
+        )
+    except InvalidChallengeError:
+        await uow.commit()
+        raise
     if await find_user_by_email(uow.session, challenge.email) is not None:
         raise InvalidChallengeError()
     user = await create_customer(uow.session, email=challenge.email)
@@ -71,3 +78,4 @@ async def complete_registration(
             actor=AuditActor(ActorKind.ANONYMOUS), target_id=user.id, correlation_id=correlation_id
         ),
     )
+    await uow.commit()

@@ -39,7 +39,6 @@ async def test_policy_failure_preserves_password_challenge_and_session(
     secret = await sessions.issue(identity_uow, user)
     await identity_uow.commit()
     identifier = await begin_reset(identity_uow, user.email, config)
-    await identity_uow.commit()
     challenge = await identity_uow.session.get(EmailChallenge, identifier)
     assert challenge is not None
     code = derive_code(challenge, config)
@@ -61,7 +60,6 @@ async def test_policy_failure_preserves_password_challenge_and_session(
             settings=config,
             correlation_id="reset-policy-test",
         )
-    await identity_uow.commit()
     await identity_uow.session.refresh(challenge)
     await identity_uow.session.refresh(credential)
     assert challenge.consumed_at is None and challenge.attempts == 0
@@ -80,5 +78,4 @@ async def test_policy_failure_preserves_password_challenge_and_session(
         settings=config,
         correlation_id="reset-policy-retry",
     )
-    await identity_uow.commit()
     assert credential.password_hash != original_hash

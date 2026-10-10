@@ -17,9 +17,16 @@ def config() -> Any:
     return AuthSettings(challenge_keys={"v1": "x" * 32})
 
 
-async def test_challenge_audit_outbox_rollback_together(identity_uow: Any) -> None:
-    await begin_registration(identity_uow, "rollback@example.com", config())
-    await identity_uow.rollback()
+async def test_challenge_audit_outbox_rollback_together(
+    identity_uow: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def fail_commit() -> None:
+        await identity_uow.rollback()
+        raise RuntimeError("simulated commit failure")
+
+    monkeypatch.setattr(identity_uow, "commit", fail_commit)
+    with pytest.raises(RuntimeError, match="simulated commit failure"):
+        await begin_registration(identity_uow, "rollback@example.com", config())
     for model in (EmailChallenge, AuditRecord, OutboxMessage):
         assert await identity_uow.session.scalar(sa.select(sa.func.count()).select_from(model)) == 0
 
@@ -27,7 +34,6 @@ async def test_challenge_audit_outbox_rollback_together(identity_uow: Any) -> No
 async def test_wrong_attempt_and_denial_audit_commit(identity_uow: Any) -> None:
     settings = config()
     challenge_id = await begin_registration(identity_uow, "attempt@example.com", settings)
-    await identity_uow.commit()
     row = await identity_uow.session.get(EmailChallenge, challenge_id)
     assert row is not None
     valid = derive_code(row, settings)
@@ -40,7 +46,6 @@ async def test_wrong_attempt_and_denial_audit_commit(identity_uow: Any) -> None:
             password="a sufficiently uncommon test phrase",
             settings=settings,
         )
-    await identity_uow.rollback()
     row = await identity_uow.session.get(EmailChallenge, challenge_id)
     assert row is not None
     assert row.attempts == 1
@@ -49,29 +54,27 @@ async def test_wrong_attempt_and_denial_audit_commit(identity_uow: Any) -> None:
     assert "auth.registration_completed" not in actions
 
 
-async def test_registration_completion_audit_is_atomic(identity_uow: Any) -> None:
+async def test_registration_completion_audit_is_atomic(
+    identity_uow: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     settings = config()
     challenge_id = await begin_registration(identity_uow, f"{uuid4().hex}@example.com", settings)
-    await identity_uow.commit()
     row = await identity_uow.session.get(EmailChallenge, challenge_id)
     assert row is not None
-    await complete_registration(
-        identity_uow,
-        challenge_id=challenge_id,
-        code=derive_code(row, settings),
-        password="a sufficiently uncommon test phrase",
-        settings=settings,
-    )
-    await identity_uow.session.flush()
-    assert (
-        await identity_uow.session.scalar(
-            sa.select(sa.func.count())
-            .select_from(AuditRecord)
-            .where(AuditRecord.action == "auth.registration_completed")
+
+    async def fail_commit() -> None:
+        await identity_uow.rollback()
+        raise RuntimeError("simulated commit failure")
+
+    monkeypatch.setattr(identity_uow, "commit", fail_commit)
+    with pytest.raises(RuntimeError, match="simulated commit failure"):
+        await complete_registration(
+            identity_uow,
+            challenge_id=challenge_id,
+            code=derive_code(row, settings),
+            password="a sufficiently uncommon test phrase",
+            settings=settings,
         )
-        == 1
-    )
-    await identity_uow.rollback()
     assert (
         await identity_uow.session.scalar(
             sa.select(sa.func.count()).select_from(PasswordCredential)

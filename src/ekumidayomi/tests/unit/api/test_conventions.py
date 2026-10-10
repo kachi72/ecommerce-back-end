@@ -1,7 +1,9 @@
 """Tests for reusable API query and response conventions."""
 
+import ast
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
@@ -22,6 +24,27 @@ from ekumidayomi.api.schemas import (
 )
 from ekumidayomi.core.types import Money, PageRequest
 from ekumidayomi.core.types import Page as DomainPage
+
+
+def test_api_layer_does_not_own_transaction_commits() -> None:
+    """Keep transaction ownership in application use cases, not HTTP adapters."""
+
+    project_root = Path(__file__).resolve().parents[5]
+    api_root = project_root / "src" / "ekumidayomi" / "api"
+    violations: list[str] = []
+    for path in api_root.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "commit"
+            ):
+                violations.append(f"{path.relative_to(project_root)}:{node.lineno}")
+
+    assert violations == [], (
+        f"API transaction commits belong in application use cases: {violations}"
+    )
 
 
 def test_pagination_is_bounded() -> None:
