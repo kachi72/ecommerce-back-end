@@ -30,7 +30,6 @@ async def register(
     challenge_id = await registration_service.begin_registration(
         uow, body.email, config, correlation_id=request.state.request_id
     )
-    await uow.commit()
     response.headers["Cache-Control"] = "no-store"
     return auth_schemas.ChallengeAccepted(challenge_id=challenge_id)
 
@@ -47,5 +46,4 @@ async def verify(
         settings=config,
         correlation_id=request.state.request_id,
     )
-    await uow.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT, headers={"Cache-Control": "no-store"})

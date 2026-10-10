@@ -24,7 +24,6 @@ async def test_policy_failure_does_not_consume_registration(
 ) -> None:
     config = AuthSettings(challenge_keys={"v1": SecretStr("k" * 32)})
     identifier = await begin_registration(identity_uow, "policy@example.com", config)
-    await identity_uow.commit()
     row = await identity_uow.session.get(EmailChallenge, identifier)
     assert row is not None
     code = derive_code(row, config)
@@ -44,7 +43,6 @@ async def test_policy_failure_does_not_consume_registration(
             password="a" * 15 if reason == "common" else "quietmeadowsbeyondtheriver",
             settings=config,
         )
-    await identity_uow.commit()
     await identity_uow.session.refresh(row)
     assert row.consumed_at is None and row.attempts == 0
     assert await find_user_by_email(identity_uow.session, "policy@example.com") is None
@@ -59,5 +57,4 @@ async def test_policy_failure_does_not_consume_registration(
         password="quietmeadowsbeyondtheriver",
         settings=config,
     )
-    await identity_uow.commit()
     assert await find_user_by_email(identity_uow.session, "policy@example.com") is not None

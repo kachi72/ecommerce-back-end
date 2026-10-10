@@ -13,7 +13,6 @@ from ekumidayomi.users.repository import find_user_by_email
 async def test_registration_consumes_challenge_once(identity_uow: UnitOfWork) -> None:
     settings = AuthSettings(challenge_keys={"v1": SecretStr("k" * 32)})
     challenge_id = await begin_registration(identity_uow, "new@example.com", settings)
-    await identity_uow.commit()
     row = await identity_uow.session.get(EmailChallenge, challenge_id)
     assert row is not None
     code = derive_code(row, settings)
@@ -25,7 +24,6 @@ async def test_registration_consumes_challenge_once(identity_uow: UnitOfWork) ->
         password="a long enough test password",
         settings=settings,
     )
-    await identity_uow.commit()
     user = await find_user_by_email(identity_uow.session, "new@example.com")
     assert user is not None and user.email_verified_at is not None
     with pytest.raises(InvalidChallengeError):
