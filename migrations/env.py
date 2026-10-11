@@ -14,6 +14,7 @@ from ekumidayomi.core.settings import get_settings
 from ekumidayomi.db.base import Base
 from ekumidayomi.jobs.models import Job
 from ekumidayomi.outbox.model import OutboxMessage, WorkerControl
+from ekumidayomi.users.address import Address
 from ekumidayomi.users.model import User
 
 _REGISTERED_MODELS = (
@@ -25,6 +26,7 @@ _REGISTERED_MODELS = (
     AuthSession,
     EmailChallenge,
     PasswordCredential,
+    Address,
 )
 
 config = context.config
