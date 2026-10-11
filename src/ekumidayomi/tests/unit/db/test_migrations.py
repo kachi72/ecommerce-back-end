@@ -11,6 +11,7 @@ from ekumidayomi.auth.model import AuthSession
 from ekumidayomi.db.base import Base
 from ekumidayomi.jobs.models import Job
 from ekumidayomi.outbox.model import OutboxMessage, WorkerControl
+from ekumidayomi.users.address import Address
 from ekumidayomi.users.model import User
 
 PROJECT_ROOT = Path(__file__).resolve().parents[5]
@@ -25,7 +26,7 @@ def get_script_directory() -> ScriptDirectory:
 def test_migration_chain_has_exactly_one_platform_head() -> None:
     script = get_script_directory()
 
-    assert script.get_heads() == ["d6de65ed565c"]
+    assert script.get_heads() == ["caf9c5f2d5ab"]
     assert script.get_base() == "0001_sprint0_baseline"
 
 
@@ -37,6 +38,7 @@ def test_platform_schema_revisions_form_one_linear_chain() -> None:
     users = get_script_directory().get_revision("4f2722ba18ca")
     sessions = get_script_directory().get_revision("111bac782bb3")
     auth_delivery = get_script_directory().get_revision("d6de65ed565c")
+    customer_addresses = get_script_directory().get_revision("caf9c5f2d5ab")
 
     assert baseline is not None
     assert baseline.down_revision is None
@@ -52,12 +54,14 @@ def test_platform_schema_revisions_form_one_linear_chain() -> None:
     assert sessions.down_revision == "4f2722ba18ca"
     assert auth_delivery is not None
     assert auth_delivery.down_revision == "111bac782bb3"
+    assert customer_addresses is not None
+    assert customer_addresses.down_revision == "d6de65ed565c"
 
 
 def test_platform_models_are_registered_for_autogeneration() -> None:
     script = get_script_directory()
 
-    assert script.get_current_head() == "d6de65ed565c"
+    assert script.get_current_head() == "caf9c5f2d5ab"
     assert Job.__tablename__ == "jobs"
     assert OutboxMessage.__tablename__ == "outbox_messages"
     assert AuditRecord.__tablename__ == "audit_records"
@@ -66,6 +70,7 @@ def test_platform_models_are_registered_for_autogeneration() -> None:
     assert EmailChallenge.__tablename__ == "email_challenges"
     assert PasswordCredential.__tablename__ == "password_credentials"
     assert WorkerControl.__tablename__ == "outbox_worker_controls"
+    assert Address.__tablename__ == "user_addresses"
     assert set(Base.metadata.tables) == {
         "audit_records",
         "auth_sessions",
@@ -74,5 +79,6 @@ def test_platform_models_are_registered_for_autogeneration() -> None:
         "outbox_messages",
         "outbox_worker_controls",
         "password_credentials",
+        "user_addresses",
         "users",
     }
