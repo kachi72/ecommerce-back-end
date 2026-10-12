@@ -122,6 +122,27 @@ class IdentityRateLimitExceededError(RateLimitError):
         return {"Retry-After": str(self.retry_after)}
 
 
+class ProfileRateLimitExceededError(RateLimitError):
+    """Too many profile changes."""
+
+    status_code = HTTPStatus.TOO_MANY_REQUESTS
+    code = "profile_rate_limit_exceeded"
+    message = "Too many profile changes. Please try again later."
+
+    def __init__(self, *, retry_after: int) -> None:
+        if isinstance(retry_after, bool) or not isinstance(retry_after, int):
+            raise TypeError("retry_after must be an integer")
+        if retry_after < 1:
+            raise ValueError("retry_after must be positive")
+        self.retry_after = retry_after
+        super().__init__(details={"retry_after": retry_after})
+
+    @property
+    def headers(self) -> dict[str, str]:
+        """Expose only the validated retry delay as an HTTP response header."""
+        return {"Retry-After": str(self.retry_after)}
+
+
 class IdentityUnavailableError(DependencyUnavailableError):
     """Authentication is temporarily unavailable."""
 

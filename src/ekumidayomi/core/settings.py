@@ -9,6 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from ekumidayomi.auth.settings import AuthSettings
 from ekumidayomi.email.settings import ResendSettings
 from ekumidayomi.outbox.settings import OutboxWorkerSettings
+from ekumidayomi.users.settings import ProfileRateLimitSettings
 
 
 class AppEnvironment(StrEnum):
@@ -79,6 +80,7 @@ class Settings(BaseSettings):
     auth: AuthSettings = Field(default_factory=AuthSettings)
     resend: ResendSettings | None = None
     outbox_worker: OutboxWorkerSettings = Field(default_factory=OutboxWorkerSettings)
+    profile_rate_limits: ProfileRateLimitSettings = Field(default_factory=ProfileRateLimitSettings)
 
     @property
     def active_database_url(self) -> str:

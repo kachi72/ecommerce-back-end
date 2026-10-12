@@ -130,3 +130,28 @@ def test_prefixed_observability_settings_are_parsed(
     assert settings.log_format is LogFormat.CONSOLE
     assert settings.trust_incoming_request_ids is True
     assert settings.tracing_endpoint is not None
+
+
+def test_profile_rate_limits_are_loaded_through_root_settings() -> None:
+    settings = Settings(
+        _env_file=None,
+        check_dependencies_on_startup=False,
+        profile_rate_limits={
+            "profile_update_limit": 12,
+            "address_mutation_limit": 34,
+            "window_seconds": 300,
+        },
+    )
+
+    assert settings.profile_rate_limits.profile_update_limit == 12
+    assert settings.profile_rate_limits.address_mutation_limit == 34
+    assert settings.profile_rate_limits.window_seconds == 300
+
+
+def test_profile_rate_limits_reject_invalid_values() -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            check_dependencies_on_startup=False,
+            profile_rate_limits={"profile_update_limit": 0},
+        )
