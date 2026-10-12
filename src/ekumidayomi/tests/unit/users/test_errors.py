@@ -41,6 +41,7 @@ from ekumidayomi.users.errors import (
     LastActiveAdminError,
     PasswordCheckUnavailableError,
     PermissionDeniedError,
+    ProfileRateLimitExceededError,
     ProviderAlreadyLinkedError,
     ReauthenticationRequiredError,
     UntrustedOriginError,
@@ -152,6 +153,14 @@ CASES: list[ErrorCase] = [
         429,
         "rate_limit_exceeded",
         "Too many attempts. Please try again later.",
+        {"retry_after": 7},
+    ),
+    (
+        lambda: ProfileRateLimitExceededError(retry_after=7),
+        RateLimitError,
+        429,
+        "profile_rate_limit_exceeded",
+        "Too many profile changes. Please try again later.",
         {"retry_after": 7},
     ),
     (
@@ -342,6 +351,7 @@ async def test_named_error_and_http_contract(
         LastActiveAdminError,
         PasswordCheckUnavailableError,
         PermissionDeniedError,
+        ProfileRateLimitExceededError,
         ProviderAlreadyLinkedError,
         ReauthenticationRequiredError,
         UntrustedOriginError,
@@ -360,16 +370,28 @@ def test_callers_cannot_override_named_error_contract(
         error_type(**override)
 
 
+@pytest.mark.parametrize(
+    "error_type",
+    [IdentityRateLimitExceededError, ProfileRateLimitExceededError],
+)
 @pytest.mark.parametrize("retry_after", [True, "7", 1.5, None])
-def test_retry_context_rejects_wrong_types(retry_after: Any) -> None:
+def test_retry_context_rejects_wrong_types(
+    error_type: Callable[..., RateLimitError], retry_after: Any
+) -> None:
     with pytest.raises(TypeError, match="integer"):
-        IdentityRateLimitExceededError(retry_after=retry_after)
+        error_type(retry_after=retry_after)
 
 
+@pytest.mark.parametrize(
+    "error_type",
+    [IdentityRateLimitExceededError, ProfileRateLimitExceededError],
+)
 @pytest.mark.parametrize("retry_after", [0, -1])
-def test_retry_context_rejects_non_positive_values(retry_after: int) -> None:
+def test_retry_context_rejects_non_positive_values(
+    error_type: Callable[..., RateLimitError], retry_after: int
+) -> None:
     with pytest.raises(ValueError, match="positive"):
-        IdentityRateLimitExceededError(retry_after=retry_after)
+        error_type(retry_after=retry_after)
 
 
 def test_named_errors_declare_metadata_without_boilerplate_constructors() -> None:
@@ -382,15 +404,22 @@ def test_named_errors_declare_metadata_without_boilerplate_constructors() -> Non
         and issubclass(value, ApplicationError)
         and value.__module__ == errors.__name__
     ]
-    assert len(declared) == 27
+    assert len(declared) == 28
     for error_type in declared:
         assert {"status_code", "code", "message"} <= error_type.__dict__.keys()
-        if error_type is not IdentityRateLimitExceededError:
+        if error_type not in {
+            IdentityRateLimitExceededError,
+            ProfileRateLimitExceededError,
+        }:
             assert "__init__" not in error_type.__dict__
 
 
-def test_rate_limit_headers_are_fresh() -> None:
-    error = IdentityRateLimitExceededError(retry_after=7)
+@pytest.mark.parametrize(
+    "error_type",
+    [IdentityRateLimitExceededError, ProfileRateLimitExceededError],
+)
+def test_rate_limit_headers_are_fresh(error_type: Callable[..., RateLimitError]) -> None:
+    error = error_type(retry_after=7)
     assert error.headers == {"Retry-After": "7"}
     error.headers["Retry-After"] = "999"
     assert error.headers == {"Retry-After": "7"}

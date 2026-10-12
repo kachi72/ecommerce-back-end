@@ -41,6 +41,13 @@ Future provider groups must follow the same composition pattern rather than add
 independent environment loaders. Group validation runs when the root is built,
 before application startup opens infrastructure connections.
 
+`Settings.profile_rate_limits` configures per-user profile mutation throttles.
+Authentication limits remain fail closed because they protect credential and
+challenge admission. Profile limits fail open during Redis outages because they
+protect resource consumption rather than authorization; a safe operational metric
+and warning are emitted while ownership and database protections remain active.
+
+
 ## Local setup
 
 From the repository root, create the untracked `.env` file.
@@ -120,6 +127,9 @@ EKUMIDAYOMI_CORS_ORIGINS=["https://shop.example.com"]
 | `EKUMIDAYOMI_REDIS_CONNECT_TIMEOUT_SECONDS` | Public | No | Bounded Redis connection timeout; greater than 0 and no more than 30 seconds. |
 | `EKUMIDAYOMI_REDIS_OPERATION_TIMEOUT_SECONDS` | Public | No | Bounded Redis command timeout; greater than 0 and no more than 30 seconds. |
 | `EKUMIDAYOMI_CHECK_DEPENDENCIES_ON_STARTUP` | Public | No | When true, startup will fail if a required dependency cannot be reached. |
+| `EKUMIDAYOMI_PROFILE_RATE_LIMITS__PROFILE_UPDATE_LIMIT` | Public | No | Per-user profile updates admitted per window; defaults to 20. |
+| `EKUMIDAYOMI_PROFILE_RATE_LIMITS__ADDRESS_MUTATION_LIMIT` | Public | No | Per-user address creates, updates, or deletes admitted per operation window; defaults to 60. |
+| `EKUMIDAYOMI_PROFILE_RATE_LIMITS__WINDOW_SECONDS` | Public | No | Shared profile mutation window in seconds; defaults to 600. |
 
 ## Container entrypoint setting
 

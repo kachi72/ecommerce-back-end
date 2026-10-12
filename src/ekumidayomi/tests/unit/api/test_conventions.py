@@ -9,6 +9,7 @@ from uuid import UUID
 
 import pytest
 from fastapi import Depends, FastAPI
+from fastapi.routing import iter_route_contexts
 from httpx import ASGITransport, AsyncClient
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
@@ -22,8 +23,12 @@ from ekumidayomi.api.schemas import (
     UTCDateTime,
     serialize_page,
 )
+from ekumidayomi.auth.rate_dependencies import identify_rate_limit
+from ekumidayomi.core.application import create_app
+from ekumidayomi.core.settings import Settings
 from ekumidayomi.core.types import Money, PageRequest
 from ekumidayomi.core.types import Page as DomainPage
+from ekumidayomi.users.rate_dependencies import profile_rate_limit
 
 
 def test_api_layer_does_not_own_transaction_commits() -> None:
@@ -312,3 +317,18 @@ def test_filters_reject_unknown_duplicate_malformed_or_unbounded_values(
 ) -> None:
     with pytest.raises(ValueError, match=message):
         parse_filters(values, allowed=allowed)
+
+
+def test_profile_routes_use_the_profile_specific_rate_limit() -> None:
+    application = create_app(Settings(_env_file=None, check_dependencies_on_startup=False))
+    profile_routes = [
+        route
+        for route in iter_route_contexts(application.routes)
+        if route.path is not None and route.path.startswith("/api/v1/profile")
+    ]
+
+    assert profile_routes
+    for route in profile_routes:
+        calls = {dependency.call for dependency in route.dependant.dependencies}
+        assert profile_rate_limit in calls
+        assert identify_rate_limit not in calls
