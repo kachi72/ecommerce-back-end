@@ -87,7 +87,7 @@ class AuditActor:
             raise TypeError("actor_id must be a UUID")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AuditFilters:
     """Exact, indexed filters for future authorized audit administration."""
 
