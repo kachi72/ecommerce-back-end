@@ -1,7 +1,12 @@
+from __future__ import annotations
+
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from ekumidayomi.api.schemas import UTCDateTime
+from ekumidayomi.users.model import Role
 
 
 class ProfileInput(BaseModel):
@@ -39,3 +44,30 @@ class AddressView(AddressInput):
     model_config = ConfigDict(from_attributes=True, extra="ignore")
 
     id: UUID
+
+
+class UserView(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    email: str
+    display_name: str
+    role: str
+    is_active: bool
+    email_verified_at: UTCDateTime | None
+    created_at: UTCDateTime
+
+
+class AccessInput(BaseModel):
+    """Schema for PATCH request to change a user's role/is_active value."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    role: Role | None = None
+    is_active: bool | None = None
+
+    @model_validator(mode="after")
+    def require_change(self) -> AccessInput:
+        if self.role is None and self.is_active is None:
+            raise ValueError("supply a role or active-state change")
+        return self

@@ -86,3 +86,4 @@ async def change_access(
         allowed_metadata_keys=frozenset({"old_role", "new_role", "old_active", "new_active"}),
         correlation_id=correlation_id,
     )
+    await uow.commit()
