@@ -17,7 +17,7 @@ _LIMITS = {
     "/auth/login": (30, 10, 300),
     "/auth/register": (20, 3, 600),
     "/auth/register/resend": (20, 3, 600),
-    "/auth/register.verify": (30, 5, 600),
+    "/auth/register/verify": (30, 5, 600),
     "/auth/password-reset/request": (20, 3, 600),
     "/auth/password-reset/confirm": (30, 5, 600),
     "/auth/reauthenticate": (2, 5, 300),

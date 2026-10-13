@@ -22,7 +22,7 @@ class ProfileView(BaseModel):
     id: UUID
     email: str
     display_name: str
-    phone: str
+    phone: str | None
 
 
 class AddressInput(BaseModel):
