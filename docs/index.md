@@ -13,6 +13,7 @@ configuration
 migrations
 testing
 operations
+authentication
 runbooks/auth-email-delivery
 adr/0001-production-infrastructure
 ```

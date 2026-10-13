@@ -64,4 +64,7 @@ async def replace_address(
 @router.delete("/addresses/{address_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_address(address_id: UUID, actor: CurrentActor, uow: Uow) -> Response:
     await users_service.delete_address(uow, actor, address_id)
-    return Response(status_code=204, headers={"Cache-Control": "no-store"})
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT,
+        headers={"Cache-Control": "no-store"},
+    )

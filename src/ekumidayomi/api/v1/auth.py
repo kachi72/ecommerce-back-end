@@ -23,7 +23,7 @@ from ekumidayomi.db.uow import UnitOfWork
 from ekumidayomi.users.errors import AuthenticationRequiredError
 from ekumidayomi.users.repository import find_user_by_id
 
-router = APIRouter(prefix="/v1/api/auth", tags=["authentication"])
+router = APIRouter(prefix="/auth", tags=["authentication"])
 Uow = Annotated[UnitOfWork, Depends(get_unit_of_work)]
 Sessions = Annotated[SessionService, Depends(session_service)]
 CurrentActor = Annotated[Actor, Depends(current_actor)]

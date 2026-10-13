@@ -11,7 +11,7 @@ from ekumidayomi.core.dependencies import get_auth_settings
 from ekumidayomi.db.dependencies import get_unit_of_work
 from ekumidayomi.db.uow import UnitOfWork
 
-router = APIRouter(prefix="/v1/api/auth", tags=["authentication"])
+router = APIRouter(prefix="/auth", tags=["authentication"])
 Uow = Annotated[UnitOfWork, Depends(get_unit_of_work)]
 Config = Annotated[AuthSettings, Depends(get_auth_settings)]
 
