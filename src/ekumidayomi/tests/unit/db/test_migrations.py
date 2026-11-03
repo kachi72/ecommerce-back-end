@@ -7,7 +7,7 @@ from alembic.script import ScriptDirectory
 
 from ekumidayomi.audit.model import AuditRecord
 from ekumidayomi.auth.challenge_model import EmailChallenge, PasswordCredential
-from ekumidayomi.auth.model import AuthSession
+from ekumidayomi.auth.model import AuthSession, ExternalIdentity
 from ekumidayomi.db.base import Base
 from ekumidayomi.jobs.models import Job
 from ekumidayomi.outbox.model import OutboxMessage, WorkerControl
@@ -26,7 +26,7 @@ def get_script_directory() -> ScriptDirectory:
 def test_migration_chain_has_exactly_one_platform_head() -> None:
     script = get_script_directory()
 
-    assert script.get_heads() == ["caf9c5f2d5ab"]
+    assert script.get_heads() == ["6f324ef7deca"]
     assert script.get_base() == "0001_sprint0_baseline"
 
 
@@ -39,6 +39,7 @@ def test_platform_schema_revisions_form_one_linear_chain() -> None:
     sessions = get_script_directory().get_revision("111bac782bb3")
     auth_delivery = get_script_directory().get_revision("d6de65ed565c")
     customer_addresses = get_script_directory().get_revision("caf9c5f2d5ab")
+    external_identities = get_script_directory().get_revision("6f324ef7deca")
 
     assert baseline is not None
     assert baseline.down_revision is None
@@ -56,17 +57,20 @@ def test_platform_schema_revisions_form_one_linear_chain() -> None:
     assert auth_delivery.down_revision == "111bac782bb3"
     assert customer_addresses is not None
     assert customer_addresses.down_revision == "d6de65ed565c"
+    assert external_identities is not None
+    assert external_identities.down_revision == "caf9c5f2d5ab"
 
 
 def test_platform_models_are_registered_for_autogeneration() -> None:
     script = get_script_directory()
 
-    assert script.get_current_head() == "caf9c5f2d5ab"
+    assert script.get_current_head() == "6f324ef7deca"
     assert Job.__tablename__ == "jobs"
     assert OutboxMessage.__tablename__ == "outbox_messages"
     assert AuditRecord.__tablename__ == "audit_records"
     assert User.__tablename__ == "users"
     assert AuthSession.__tablename__ == "auth_sessions"
+    assert ExternalIdentity.__tablename__ == "external_identities"
     assert EmailChallenge.__tablename__ == "email_challenges"
     assert PasswordCredential.__tablename__ == "password_credentials"
     assert WorkerControl.__tablename__ == "outbox_worker_controls"
@@ -75,6 +79,7 @@ def test_platform_models_are_registered_for_autogeneration() -> None:
         "audit_records",
         "auth_sessions",
         "email_challenges",
+        "external_identities",
         "jobs",
         "outbox_messages",
         "outbox_worker_controls",

@@ -71,6 +71,13 @@ async def identify_rate_limit(
                 identity = challenge_id[:64]
     if not identity and path == "/auth/reauthenticate":
         identity = request.cookies.get(cookie_name(settings), "")
+    if (
+        not identity
+        and request.method not in {"GET", "HEAD", "OPTIONS"}
+        and path.startswith("/auth/oidc/")
+        and not path.endswith("/start")
+    ):
+        identity = request.cookies.get(cookie_name(settings), "")
     if identity:
         await enforce(
             redis,

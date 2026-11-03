@@ -19,7 +19,11 @@ lock:
 dev:
     uv run uvicorn ekumidayomi.main:app --reload
 
-run: dev
+sync:
+    uv sync --all-extras
+
+run: 
+    dev
 
 lint:
     uv run ruff check src migrations

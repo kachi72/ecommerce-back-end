@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from ekumidayomi.audit.model import AuditRecord
 from ekumidayomi.auth.challenge_model import EmailChallenge, PasswordCredential
-from ekumidayomi.auth.model import AuthSession
+from ekumidayomi.auth.model import AuthSession, ExternalIdentity
 from ekumidayomi.core.settings import get_settings
 from ekumidayomi.db.base import Base
 from ekumidayomi.jobs.models import Job
@@ -27,6 +27,7 @@ _REGISTERED_MODELS = (
     EmailChallenge,
     PasswordCredential,
     Address,
+    ExternalIdentity,
 )
 
 config = context.config

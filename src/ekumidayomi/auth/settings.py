@@ -4,6 +4,8 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
+from ekumidayomi.auth.oidc.settings import OidcSettings
+
 
 class AuthSettings(BaseModel):
     """Group auth policy without reading the environment or owning a settings cache."""
@@ -19,6 +21,7 @@ class AuthSettings(BaseModel):
     allowed_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     challenge_keys: dict[str, SecretStr] = Field(default_factory=dict)
     active_challenge_key: str = "v1"
+    oidc: OidcSettings = Field(default_factory=OidcSettings)
 
     @model_validator(mode="after")
     def validate_keys(self) -> Self:
