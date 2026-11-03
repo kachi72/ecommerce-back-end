@@ -18,6 +18,19 @@ EKUMIDAYOMI_AUTH__ALLOWED_ORIGINS=["https://shop.example.com"]
 EKUMIDAYOMI_AUTH__ACTIVE_CHALLENGE_KEY=v1
 ```
 
+OIDC settings are nested beneath the same auth group. Providers remain disabled unless the
+complete provider configuration validates:
+
+```text
+EKUMIDAYOMI_AUTH__OIDC__GOOGLE__ENABLED=true
+EKUMIDAYOMI_AUTH__OIDC__GOOGLE__CLIENT_ID=google-client-id
+EKUMIDAYOMI_AUTH__OIDC__GOOGLE__CLIENT_SECRET=<runtime-secret>
+EKUMIDAYOMI_AUTH__OIDC__GOOGLE__REDIRECT_URI=https://api.example.com/api/v1/auth/oidc/google/callback
+```
+
+Yahoo uses `YAHOO` in place of `GOOGLE` and additionally requires
+`EKUMIDAYOMI_AUTH__OIDC__YAHOO__PKCE_VERIFIED=true` after controlled provider verification.
+
 Use `EKUMIDAYOMI_AUTH__CHALLENGE_KEYS` for the JSON map of version names to secret
 keys, injected through the secret boundary. Configure real keys before enabling
 challenge workflows; this configuration change does not enable auth endpoints.
@@ -130,6 +143,20 @@ EKUMIDAYOMI_CORS_ORIGINS=["https://shop.example.com"]
 | `EKUMIDAYOMI_PROFILE_RATE_LIMITS__PROFILE_UPDATE_LIMIT` | Public | No | Per-user profile updates admitted per window; defaults to 20. |
 | `EKUMIDAYOMI_PROFILE_RATE_LIMITS__ADDRESS_MUTATION_LIMIT` | Public | No | Per-user address creates, updates, or deletes admitted per operation window; defaults to 60. |
 | `EKUMIDAYOMI_PROFILE_RATE_LIMITS__WINDOW_SECONDS` | Public | No | Shared profile mutation window in seconds; defaults to 600. |
+
+### OIDC settings
+
+| Environment variable | Classification | Required in production | Purpose and behavior |
+|---|---|---:|---|
+| `EKUMIDAYOMI_AUTH__OIDC__GOOGLE__ENABLED` | Public | No | Enables Google only when its complete configuration validates. |
+| `EKUMIDAYOMI_AUTH__OIDC__GOOGLE__CLIENT_ID` | Sensitive configuration | When Google is enabled | Provider-issued client identifier for the exact callback. |
+| `EKUMIDAYOMI_AUTH__OIDC__GOOGLE__CLIENT_SECRET` | Secret | When Google is enabled | Provider-issued secret injected at runtime. |
+| `EKUMIDAYOMI_AUTH__OIDC__GOOGLE__REDIRECT_URI` | Public | When Google is enabled | Exact HTTPS callback registered with Google. |
+| `EKUMIDAYOMI_AUTH__OIDC__YAHOO__ENABLED` | Public | No | Enables Yahoo only after the S256 safety gate passes. |
+| `EKUMIDAYOMI_AUTH__OIDC__YAHOO__CLIENT_ID` | Sensitive configuration | When Yahoo is enabled | Provider-issued client identifier for the exact callback. |
+| `EKUMIDAYOMI_AUTH__OIDC__YAHOO__CLIENT_SECRET` | Secret | When Yahoo is enabled | Provider-issued secret injected at runtime. |
+| `EKUMIDAYOMI_AUTH__OIDC__YAHOO__REDIRECT_URI` | Public | When Yahoo is enabled | Exact HTTPS callback registered with Yahoo. |
+| `EKUMIDAYOMI_AUTH__OIDC__YAHOO__PKCE_VERIFIED` | Public safety gate | When Yahoo is enabled | Records controlled verification of Yahoo S256 enforcement; never set merely to bypass validation. |
 
 ## Container entrypoint setting
 

@@ -174,6 +174,25 @@ async def test_oidc_paths_use_the_provider_limit(
     assert enforce_call.kwargs["limit"] == 30
 
 
+async def test_authenticated_oidc_mutation_uses_session_account_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    enforce = AsyncMock()
+    monkeypatch.setattr(rate_dependencies, "enforce", enforce)
+
+    await rate_dependencies.identify_rate_limit(
+        request_for(
+            "/api/v1/auth/oidc/google/link",
+            cookie="s" * 43,
+        ),
+        AuthSettings(allowed_origins=["http://testserver"]),
+    )
+
+    assert enforce.await_count == 2
+    assert enforce.await_args_list[-1].kwargs["identity"] == "s" * 43
+    assert enforce.await_args_list[-1].kwargs["limit"] == 10
+
+
 async def test_unlimited_safe_route_returns_without_redis(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

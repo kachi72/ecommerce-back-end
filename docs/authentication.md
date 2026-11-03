@@ -108,10 +108,37 @@ sanitized audit records rather than request bodies or authentication material.
 
 ## External identity providers
 
-Google and Yahoo OIDC are planned in S2-011 and are not active in the current application. Do not
-configure provider callbacks or claim external-login support until that sprint's signature, claim,
-state, nonce, PKCE, linking and replay tests pass. External identity will still issue the same
-opaque local session; provider ID tokens will never become application sessions.
+Google and Yahoo use authorization-code OIDC with S256 PKCE. Both providers are disabled by
+default. Enabling one requires its client ID, client secret and exact HTTPS callback URI. Yahoo
+also requires `PKCE_VERIFIED=true`; keep it disabled until a controlled provider test proves that
+Yahoo enforces the S256 verifier and returns the required claims.
+
+The login attempt is stored once in Redis and bound to a dedicated HttpOnly browser cookie. The
+callback consumes the attempt atomically and validates the state, provider, browser binding,
+nonce, RS256 signature, issuer, audience, authorized party, expiry, issued-at time and subject.
+Provider reauthentication additionally requires a fresh `auth_time`. Redis failure fails closed.
+
+Provider tokens are discarded after validation. A successful provider login creates the same
+revocable PostgreSQL session and opaque browser cookie as password login. Provider claims never
+assign roles. A matching email address never auto-links an existing account: linking is an
+authenticated, recently reauthenticated action. Unlinking cannot remove the final usable login
+method.
+
+Configure Google with:
+
+- `EKUMIDAYOMI_AUTH__OIDC__GOOGLE__ENABLED`
+- `EKUMIDAYOMI_AUTH__OIDC__GOOGLE__CLIENT_ID`
+- `EKUMIDAYOMI_AUTH__OIDC__GOOGLE__CLIENT_SECRET`
+- `EKUMIDAYOMI_AUTH__OIDC__GOOGLE__REDIRECT_URI`
+
+Yahoo uses the equivalent `EKUMIDAYOMI_AUTH__OIDC__YAHOO__*` names plus
+`EKUMIDAYOMI_AUTH__OIDC__YAHOO__PKCE_VERIFIED`. Configure the provider console callback to the
+exact value supplied to the application. Do not add wildcard callbacks.
+
+Authorization codes arrive in callback query strings. Disable Uvicorn's access logger in the
+production process (for example, `--no-access-log`) and configure the reverse proxy and edge not
+to record query strings. Retain the application's structured request log, which records the route
+template and request ID without authentication query values.
 
 ## Privacy-safe telemetry
 
@@ -137,8 +164,8 @@ just docs-check
 
 The identity gate additionally covers an in-process customer journey, challenge denial and replay
 behavior, session revocation, customer/admin separation, address ownership, independent-connection
-administrator and verification races, and real-Redis rate-limit atomicity. OIDC evidence remains a
-required S2-011 follow-up rather than being represented by placeholder tests.
+administrator and verification races, real-Redis rate-limit atomicity, OIDC state/browser replay,
+signed ID-token claim validation and external-identity lifecycle rules.
 
 ## References
 
